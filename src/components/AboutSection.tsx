@@ -22,7 +22,7 @@ export const AboutSection: React.FC<AboutSectionProps> = ({
       <div className="absolute top-0 right-1/4 w-96 h-96 bg-amber-500/5 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute -bottom-10 left-10 w-80 h-80 bg-blue-500/5 rounded-full blur-3xl pointer-events-none" />
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+      <div className="w-full max-w-none mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         {/* Section Header */}
         <div className="mb-12">
           <div className="flex items-center gap-2 text-xs font-semibold tracking-wider uppercase text-amber-400 mb-3">
@@ -39,33 +39,6 @@ export const AboutSection: React.FC<AboutSectionProps> = ({
             Welcome to the official portfolio of <strong className="text-white font-semibold">{profile.name}</strong>. 
             Pursuing athletic mastery on the fairway and in the pool, grounded by rigorous STEM biomechanics inquiry, academic excellence, and youth community service.
           </p>
-
-          {/* Quick Action Buttons */}
-          {(onExploreClick || (featuredVideoItem && onOpenVideo)) && (
-            <div className="flex flex-wrap items-center gap-4 mt-6">
-              {onExploreClick && (
-                <button
-                  type="button"
-                  onClick={onExploreClick}
-                  className="cursor-pointer inline-flex items-center gap-2 px-5 py-3 rounded-lg bg-amber-500 text-neutral-950 font-semibold text-xs sm:text-sm hover:bg-amber-400 active:bg-amber-600 transition-colors shadow-lg shadow-amber-500/10"
-                >
-                  <span>주요 추천 자료 보기 (Explore Highlights)</span>
-                  <ArrowDown className="w-4 h-4" />
-                </button>
-              )}
-
-              {featuredVideoItem && onOpenVideo && (
-                <button
-                  type="button"
-                  onClick={() => onOpenVideo(featuredVideoItem)}
-                  className="cursor-pointer inline-flex items-center gap-2 px-5 py-3 rounded-lg bg-neutral-900 text-neutral-200 border border-neutral-700/80 font-medium text-xs sm:text-sm hover:bg-neutral-800 hover:text-white transition-colors"
-                >
-                  <Play className="w-4 h-4 text-amber-400 fill-amber-400" />
-                  <span>스윙 영상 재생 (Watch Swing Reel)</span>
-                </button>
-              )}
-            </div>
-          )}
         </div>
 
         {/* 2-Column Split: Visuals + Story */}
