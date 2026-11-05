@@ -32,10 +32,10 @@ export const AboutSection: React.FC<AboutSectionProps> = ({
             <span aria-hidden="true" className="text-neutral-600">·</span>
             <span>Class of {profile.graduationYear}</span>
           </div>
-          <h1 className="font-['Outfit'] text-3xl sm:text-5xl lg:text-6xl font-extrabold text-white tracking-tight leading-[1.08] max-w-4xl">
+          <h1 className="font-['Outfit'] text-3xl sm:text-5xl lg:text-6xl font-extrabold text-white tracking-tight leading-[1.08]">
             {profile.subtitle || 'Dedication Across Disciplines: Precision on the Course, Power in the Pool.'}
           </h1>
-          <p className="text-neutral-300 text-sm sm:text-lg mt-4 max-w-3xl leading-relaxed">
+          <p className="text-neutral-300 text-sm sm:text-lg mt-4 leading-relaxed">
             Welcome to the official portfolio of <strong className="text-white font-semibold">{profile.name}</strong>. 
             Pursuing athletic mastery on the fairway and in the pool, grounded by rigorous STEM biomechanics inquiry, academic excellence, and youth community service.
           </p>
