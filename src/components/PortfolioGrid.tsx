@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useCallback, useState } from 'react';
 import { Play, Image as ImageIcon, ExternalLink, Edit2, Trash2, Calendar, Star } from 'lucide-react';
 import { PortfolioItem, Category } from '../types/portfolio';
+import { ConfirmDialog } from './ConfirmDialog';
 
 interface PortfolioGridProps {
   items: PortfolioItem[];
@@ -23,6 +24,21 @@ export const PortfolioGrid: React.FC<PortfolioGridProps> = ({
   onDeleteItem,
   onAddNewItem
 }) => {
+  // 삭제 전 최종 확인
+  const [pendingDelete, setPendingDelete] = useState<PortfolioItem | null>(null);
+  const closeDialog = useCallback(() => setPendingDelete(null), []);
+  const deleteDialog = (
+    <ConfirmDialog
+      isOpen={!!pendingDelete}
+      title="자료 삭제 확인"
+      description={`'${pendingDelete?.title ?? ''}' 자료를 삭제하시겠습니까? 업로드된 사진과 상세 내용이 모두 삭제됩니다.`}
+      onConfirm={() => {
+        if (pendingDelete && onDeleteItem) return onDeleteItem(pendingDelete.id);
+      }}
+      onCancel={closeDialog}
+    />
+  );
+
   // Helper to get category and submenu label
   const getSubmenuLabel = (item: PortfolioItem) => {
     const cat = categories.find((c) => c.id === item.categoryId);
@@ -58,6 +74,8 @@ export const PortfolioGrid: React.FC<PortfolioGridProps> = ({
 
   if (viewMode === 'list') {
     return (
+      <>
+      {deleteDialog}
       <div className="divide-y divide-neutral-800/80 border border-neutral-800 rounded-xl bg-neutral-900/30 overflow-hidden">
         {items.map((item) => (
           <div
@@ -158,10 +176,9 @@ export const PortfolioGrid: React.FC<PortfolioGridProps> = ({
                   )}
                   {onDeleteItem && (
                     <button
-                      onClick={() => {
-                        if (confirm(`'${item.title}' 자료를 정말 삭제하시겠습니까?`)) {
-                          onDeleteItem(item.id);
-                        }
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setPendingDelete(item);
                       }}
                       className="cursor-pointer p-1.5 rounded text-red-400 hover:text-red-300 hover:bg-red-500/10"
                       title="자료 삭제"
@@ -175,11 +192,14 @@ export const PortfolioGrid: React.FC<PortfolioGridProps> = ({
           </div>
         ))}
       </div>
+      </>
     );
   }
 
   // Grid View (Bento Grid)
   return (
+    <>
+    {deleteDialog}
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       {items.map((item, idx) => {
         const isWide = item.featured && idx === 0;
@@ -257,10 +277,9 @@ export const PortfolioGrid: React.FC<PortfolioGridProps> = ({
                     )}
                     {onDeleteItem && (
                       <button
-                        onClick={() => {
-                          if (confirm(`'${item.title}' 자료를 정말 삭제하시겠습니까?`)) {
-                            onDeleteItem(item.id);
-                          }
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setPendingDelete(item);
                         }}
                         className="cursor-pointer p-1 text-red-400 hover:text-red-300"
                         title="자료 삭제"
@@ -325,5 +344,6 @@ export const PortfolioGrid: React.FC<PortfolioGridProps> = ({
         );
       })}
     </div>
+    </>
   );
 };

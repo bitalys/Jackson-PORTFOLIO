@@ -52,6 +52,7 @@ export interface SiteProfile {
   name: string;
   title: string;
   subtitle: string;
+  intro?: string; // Home 상단 소개 문단 (이름 뒤에 이어지는 문장)
   bio: string;
   bioGolf?: string;
   bioSwim?: string;
@@ -60,6 +61,8 @@ export interface SiteProfile {
   gpa: string;
   portraitImage?: string;
   swimmingImage?: string;
+  swimmingCaption?: string; // 수영 사진 하단 문구
+  swimmingCaptionValue?: string; // 수영 사진 하단 우측 기록
   email: string;
   phone: string;
   socials: {

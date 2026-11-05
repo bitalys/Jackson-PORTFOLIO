@@ -9,8 +9,11 @@ import {
   PortfolioStorage, 
   readFileAsDataUrl, 
   extractYouTubeId,
-  DEFAULT_PROFILE
+  DEFAULT_PROFILE,
+  PORTRAIT_IMAGE,
+  SWIMMING_IMAGE
 } from '../services/storage';
+import { ConfirmDialog } from './ConfirmDialog';
 
 interface AdminModalProps {
   isOpen: boolean;
@@ -59,6 +62,11 @@ export const AdminModal: React.FC<AdminModalProps> = ({
       onConfirm
     });
   };
+
+  const closeDeleteConfirm = React.useCallback(
+    () => setDeleteConfirm((prev) => ({ ...prev, isOpen: false })),
+    []
+  );
 
   // Items Tab Filter & Categorization State
   const [filterCategoryId, setFilterCategoryId] = useState<string>('all');
@@ -149,10 +157,13 @@ export const AdminModal: React.FC<AdminModalProps> = ({
     setEditItemId(null);
     setTitle('');
     setSubtitle('');
-    const defaultCat = categories[0]?.id || 'athletics';
+    // 자료 관리에서 카테고리/서브메뉴 필터가 선택돼 있으면 그 분류로 바로 등록
+    const filterCat = categories.find((c) => c.id === filterCategoryId);
+    const defaultCat = filterCat?.id || categories[0]?.id || 'athletics';
     setCategoryId(defaultCat);
     const catObj = categories.find((c) => c.id === defaultCat);
-    setSubmenuId(catObj?.submenus[0]?.id || '');
+    const filterSub = catObj?.submenus.find((sm) => sm.id === filterSubmenuId);
+    setSubmenuId(filterSub?.id || catObj?.submenus[0]?.id || '');
     setDate(new Date().getFullYear().toString());
     setFeatured(false);
     setMediaType('both');
@@ -321,10 +332,65 @@ export const AdminModal: React.FC<AdminModalProps> = ({
     }
   };
 
-  // Delete Item
-  const handleDeleteItem = async (id: string) => {
-    await PortfolioStorage.deleteItem(id);
-    onDataChanged();
+  // Delete Item (최종 확인 후 삭제)
+  const handleDeleteItem = (item: PortfolioItem) => {
+    promptDelete(
+      '자료 삭제 확인',
+      `'${item.title}' 자료를 삭제하시겠습니까? 업로드된 사진과 상세 내용이 모두 삭제됩니다.`,
+      async () => {
+        await PortfolioStorage.deleteItem(item.id);
+        onDataChanged();
+      }
+    );
+  };
+
+  // Items tab: filter + grouping
+  const normalizedQuery = itemSearchQuery.trim().toLowerCase();
+  const filteredItems = items.filter((item) => {
+    if (filterCategoryId !== 'all' && item.categoryId !== filterCategoryId) return false;
+    if (filterSubmenuId !== 'all' && item.submenuId !== filterSubmenuId) return false;
+    if (!normalizedQuery) return true;
+    return [item.title, item.subtitle, item.summary, item.date]
+      .filter(Boolean)
+      .some((v) => String(v).toLowerCase().includes(normalizedQuery));
+  });
+  const filterCategory = categories.find((c) => c.id === filterCategoryId);
+
+  // 카테고리 > 서브메뉴 순서로 그룹 구성 (어느 분류에도 속하지 않는 자료는 '미분류'로)
+  const groupedItems: {
+    key: string;
+    categoryLabel: string;
+    submenuName: string;
+    categoryId: string;
+    submenuId: string;
+    items: PortfolioItem[];
+  }[] = [];
+  const placedIds = new Set<string>();
+  categories.forEach((cat) => {
+    cat.submenus.forEach((sub) => {
+      const list = filteredItems.filter((i) => i.categoryId === cat.id && i.submenuId === sub.id);
+      list.forEach((i) => placedIds.add(i.id));
+      if (list.length > 0 || (filterCategoryId === cat.id && (filterSubmenuId === 'all' || filterSubmenuId === sub.id) && !normalizedQuery)) {
+        groupedItems.push({ key: `${cat.id}/${sub.id}`, categoryLabel: cat.label, submenuName: sub.name, categoryId: cat.id, submenuId: sub.id, items: list });
+      }
+    });
+    const orphan = filteredItems.filter((i) => i.categoryId === cat.id && !placedIds.has(i.id));
+    orphan.forEach((i) => placedIds.add(i.id));
+    if (orphan.length > 0) {
+      groupedItems.push({ key: `${cat.id}/_none`, categoryLabel: cat.label, submenuName: '서브메뉴 미지정', categoryId: cat.id, submenuId: '', items: orphan });
+    }
+  });
+  const unplaced = filteredItems.filter((i) => !placedIds.has(i.id));
+  if (unplaced.length > 0) {
+    groupedItems.push({ key: '_none', categoryLabel: '미분류', submenuName: '카테고리 없음', categoryId: '', submenuId: '', items: unplaced });
+  }
+
+  const handleStartNewItemIn = (catId: string, subId: string) => {
+    handleStartNewItem();
+    if (catId) {
+      setCategoryId(catId);
+      setSubmenuId(subId || categories.find((c) => c.id === catId)?.submenus[0]?.id || '');
+    }
   };
 
   // Create Submenu (서브 메뉴 새로 생성)
@@ -345,7 +411,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
   const handleDeleteSubmenu = (catId: string, subId: string, subName?: string) => {
     promptDelete(
       '서브메뉴 삭제 확인',
-      `'${subName || '서브메뉴'}'를 삭제하시겠습니까? 해당 서브메뉴에 속한 자료는 카테고리에 안전하게 유지됩니다.`,
+      `'${subName || '서브메뉴'}' 서브메뉴를 삭제하시겠습니까? 해당 서브메뉴에 속한 자료는 카테고리에 안전하게 유지됩니다.`,
       async () => {
         await PortfolioStorage.deleteSubmenu(catId, subId);
         onDataChanged();
@@ -369,7 +435,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
   const handleDeleteCategory = (catId: string, catLabel?: string) => {
     promptDelete(
       '카테고리 삭제 확인',
-      `'${catLabel || '카테고리'}'를 삭제하시겠습니까? 포함된 하위 서브메뉴가 함께 삭제됩니다.`,
+      `'${catLabel || '카테고리'}' 카테고리를 삭제하시겠습니까? 포함된 하위 서브메뉴가 함께 삭제됩니다.`,
       async () => {
         await PortfolioStorage.deleteCategory(catId);
         onDataChanged();
@@ -461,6 +527,83 @@ export const AdminModal: React.FC<AdminModalProps> = ({
     );
   };
 
+  const adminInputCls =
+    'w-full bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400 leading-relaxed';
+
+  const renderItemRow = (item: PortfolioItem) => {
+    const cat = categories.find((c) => c.id === item.categoryId);
+    const sub = cat?.submenus.find((s) => s.id === item.submenuId);
+
+    return (
+      <div
+        key={item.id}
+        className="p-4 rounded-xl border border-neutral-800 bg-neutral-950/60 flex items-center justify-between gap-4 hover:border-neutral-700 transition-colors"
+      >
+        <div className="flex items-center gap-3.5 min-w-0">
+          {/* Thumbnail */}
+          <div className="w-16 h-16 rounded-lg overflow-hidden bg-neutral-900 border border-neutral-800 shrink-0 relative">
+            {item.coverImage ? (
+              <img
+                src={item.coverImage}
+                alt={item.title}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-neutral-600">
+                <ImageIcon className="w-5 h-5" />
+              </div>
+            )}
+            {item.youtubeVideoId && (
+              <div className="absolute inset-0 bg-neutral-950/40 flex items-center justify-center">
+                <Film className="w-3.5 h-3.5 text-amber-400" />
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-1 min-w-0">
+            <div className="flex items-center gap-2 text-xs text-neutral-400">
+              <span className="font-semibold text-amber-400">
+                {cat?.label || item.categoryId} · {sub?.name || item.submenuId}
+              </span>
+              <span aria-hidden="true">·</span>
+              <span className="font-mono text-neutral-400">{item.date}</span>
+              {item.featured && (
+                <>
+                  <span aria-hidden="true">·</span>
+                  <span className="text-amber-300 text-[10px] font-bold">Featured</span>
+                </>
+              )}
+            </div>
+            <h4 className="font-bold text-white text-sm truncate">
+              {item.title}
+            </h4>
+            <p className="text-xs text-neutral-400 truncate max-w-xl">
+              {item.summary}
+            </p>
+          </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={() => handleStartEdit(item)}
+            className="cursor-pointer flex items-center gap-1 px-3 py-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-xs text-neutral-200 transition-colors"
+          >
+            <Edit3 className="w-3.5 h-3.5 text-amber-400" />
+            <span>수정</span>
+          </button>
+          <button
+            onClick={() => handleDeleteItem(item)}
+            className="cursor-pointer p-1.5 rounded-lg bg-neutral-800 hover:bg-red-500/20 text-neutral-400 hover:text-red-400 transition-colors"
+            title="삭제"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-neutral-950/85 backdrop-blur-md overflow-y-auto">
       <div className="fixed inset-0" onClick={onClose} />
@@ -545,7 +688,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
           <div className="flex-1 flex flex-col overflow-hidden">
             {/* Admin Tabs */}
             {!isEditing && (
-              <div className="flex items-center gap-2 px-6 pt-4 border-b border-neutral-800 bg-neutral-950/40">
+              <div className="flex items-center gap-2 px-6 pt-4 border-b border-neutral-800 bg-neutral-950/40 overflow-x-auto whitespace-nowrap">
                 <button
                   onClick={() => setActiveTab('items')}
                   className={`cursor-pointer flex items-center gap-2 px-4 py-2.5 text-xs font-semibold rounded-t-lg border-b-2 transition-colors ${
@@ -1085,13 +1228,14 @@ export const AdminModal: React.FC<AdminModalProps> = ({
               ) : activeTab === 'items' ? (
                 /* -------------------- 2. ITEMS LIST TAB -------------------- */
                 <div className="space-y-4">
-                  <div className="flex items-center justify-between pb-3 border-b border-neutral-800">
+                  <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-neutral-800">
                     <div>
                       <h3 className="font-['Outfit'] text-base font-bold text-white">
-                        등록된 자료 목록 ({items.length}개)
+                        등록된 자료 목록 ({filteredItems.length}
+                        {filteredItems.length !== items.length && ` / 전체 ${items.length}`}개)
                       </h3>
                       <p className="text-xs text-neutral-400">
-                        컴퓨터에서 사진을 업로드하거나 유튜브 영상을 등록한 포트폴리오 항목입니다.
+                        카테고리와 서브메뉴별로 분류해서 자료를 관리할 수 있습니다.
                       </p>
                     </div>
 
@@ -1100,90 +1244,143 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                       className="cursor-pointer flex items-center gap-1.5 px-4 py-2 bg-amber-500 hover:bg-amber-400 text-neutral-950 font-bold text-xs rounded-lg transition-colors shadow-md"
                     >
                       <Plus className="w-4 h-4" />
-                      <span>+ 자료 추가하기</span>
+                      <span>
+                        자료 추가하기
+                        {filterCategory && ` (${filterCategory.label}${
+                          filterSubmenuId !== 'all'
+                            ? ' · ' + (filterCategory.submenus.find((sm) => sm.id === filterSubmenuId)?.name || '')
+                            : ''
+                        })`}
+                      </span>
                     </button>
                   </div>
 
-                  {/* List of items */}
-                  <div className="space-y-3">
-                    {items.map((item) => {
-                      const cat = categories.find((c) => c.id === item.categoryId);
-                      const sub = cat?.submenus.find((s) => s.id === item.submenuId);
+                  {/* Category chips */}
+                  <div className="space-y-2">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <Folder className="w-3.5 h-3.5 text-neutral-500 mr-1" />
+                      {[{ id: 'all', label: '전체' }, ...categories].map((c) => {
+                        const count = c.id === 'all' ? items.length : items.filter((i) => i.categoryId === c.id).length;
+                        const active = filterCategoryId === c.id;
+                        return (
+                          <button
+                            key={c.id}
+                            onClick={() => {
+                              setFilterCategoryId(c.id);
+                              setFilterSubmenuId('all');
+                            }}
+                            className={`cursor-pointer px-3 py-1.5 text-xs font-semibold rounded-full border transition-colors ${
+                              active
+                                ? 'bg-amber-500/20 border-amber-500/60 text-amber-300'
+                                : 'bg-neutral-950 border-neutral-800 text-neutral-400 hover:text-white'
+                            }`}
+                          >
+                            {c.label} <span className="font-mono opacity-70">{count}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
 
-                      return (
-                        <div
-                          key={item.id}
-                          className="p-4 rounded-xl border border-neutral-800 bg-neutral-950/60 flex items-center justify-between gap-4 hover:border-neutral-700 transition-colors"
-                        >
-                          <div className="flex items-center gap-3.5 min-w-0">
-                            {/* Thumbnail */}
-                            <div className="w-16 h-16 rounded-lg overflow-hidden bg-neutral-900 border border-neutral-800 shrink-0 relative">
-                              {item.coverImage ? (
-                                <img
-                                  src={item.coverImage}
-                                  alt={item.title}
-                                  className="w-full h-full object-cover"
-                                />
-                              ) : (
-                                <div className="w-full h-full flex items-center justify-center text-neutral-600">
-                                  <ImageIcon className="w-5 h-5" />
-                                </div>
-                              )}
-                              {item.youtubeVideoId && (
-                                <div className="absolute inset-0 bg-neutral-950/40 flex items-center justify-center">
-                                  <Film className="w-3.5 h-3.5 text-amber-400" />
-                                </div>
-                              )}
-                            </div>
-
-                            <div className="space-y-1 min-w-0">
-                              <div className="flex items-center gap-2 text-xs text-neutral-400">
-                                <span className="font-semibold text-amber-400">
-                                  {cat?.label || item.categoryId} · {sub?.name || item.submenuId}
-                                </span>
-                                <span aria-hidden="true">·</span>
-                                <span className="font-mono text-neutral-400">{item.date}</span>
-                                {item.featured && (
-                                  <>
-                                    <span aria-hidden="true">·</span>
-                                    <span className="text-amber-300 text-[10px] font-bold">Featured</span>
-                                  </>
-                                )}
-                              </div>
-                              <h4 className="font-bold text-white text-sm truncate">
-                                {item.title}
-                              </h4>
-                              <p className="text-xs text-neutral-400 truncate max-w-xl">
-                                {item.summary}
-                              </p>
-                            </div>
-                          </div>
-
-                          {/* Action Buttons */}
-                          <div className="flex items-center gap-2 shrink-0">
+                    {/* Submenu chips for selected category */}
+                    {filterCategory && filterCategory.submenus.length > 0 && (
+                      <div className="flex flex-wrap items-center gap-1.5 pl-5">
+                        <Filter className="w-3.5 h-3.5 text-neutral-500 mr-1" />
+                        {[{ id: 'all', name: '전체 서브메뉴' }, ...filterCategory.submenus].map((sm) => {
+                          const count = items.filter(
+                            (i) => i.categoryId === filterCategory.id && (sm.id === 'all' || i.submenuId === sm.id)
+                          ).length;
+                          const active = filterSubmenuId === sm.id;
+                          return (
                             <button
-                              onClick={() => handleStartEdit(item)}
-                              className="cursor-pointer flex items-center gap-1 px-3 py-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-xs text-neutral-200 transition-colors"
+                              key={sm.id}
+                              onClick={() => setFilterSubmenuId(sm.id)}
+                              className={`cursor-pointer px-2.5 py-1 text-[11px] font-semibold rounded-full border transition-colors ${
+                                active
+                                  ? 'bg-neutral-100 border-neutral-100 text-neutral-950'
+                                  : 'bg-neutral-950 border-neutral-800 text-neutral-400 hover:text-white'
+                              }`}
                             >
-                              <Edit3 className="w-3.5 h-3.5 text-amber-400" />
-                              <span>수정</span>
+                              {sm.name} <span className="font-mono opacity-70">{count}</span>
                             </button>
-                            <button
-                              onClick={() => {
-                                if (confirm(`'${item.title}' 자료를 정말 삭제하시겠습니까?`)) {
-                                  handleDeleteItem(item.id);
-                                }
-                              }}
-                              className="cursor-pointer p-1.5 rounded-lg bg-neutral-800 hover:bg-red-500/20 text-neutral-400 hover:text-red-400 transition-colors"
-                              title="삭제"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
+
+                  {/* Search + view mode */}
+                  <div className="flex items-center gap-2">
+                    <div className="relative flex-1">
+                      <Search className="w-3.5 h-3.5 text-neutral-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="text"
+                        value={itemSearchQuery}
+                        onChange={(e) => setItemSearchQuery(e.target.value)}
+                        placeholder="제목, 부제목, 요약, 일자로 검색"
+                        className="w-full bg-neutral-950 border border-neutral-800 rounded-lg pl-8 pr-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400"
+                      />
+                    </div>
+                    <div className="flex items-center rounded-lg border border-neutral-800 bg-neutral-950 p-0.5">
+                      <button
+                        onClick={() => setViewModeGrouping('grouped')}
+                        title="분류별 보기"
+                        className={`cursor-pointer flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-semibold rounded-md transition-colors ${
+                          viewModeGrouping === 'grouped' ? 'bg-neutral-800 text-amber-300' : 'text-neutral-400 hover:text-white'
+                        }`}
+                      >
+                        <LayoutGrid className="w-3.5 h-3.5" />
+                        <span>분류별</span>
+                      </button>
+                      <button
+                        onClick={() => setViewModeGrouping('list')}
+                        title="전체 목록 보기"
+                        className={`cursor-pointer flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-semibold rounded-md transition-colors ${
+                          viewModeGrouping === 'list' ? 'bg-neutral-800 text-amber-300' : 'text-neutral-400 hover:text-white'
+                        }`}
+                      >
+                        <List className="w-3.5 h-3.5" />
+                        <span>목록</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Items */}
+                  {filteredItems.length === 0 && (viewModeGrouping === 'list' || groupedItems.length === 0) ? (
+                    <div className="p-10 text-center rounded-xl border border-dashed border-neutral-800 text-xs text-neutral-400">
+                      조건에 맞는 자료가 없습니다.
+                    </div>
+                  ) : viewModeGrouping === 'grouped' ? (
+                    <div className="space-y-6">
+                      {groupedItems.map((group) => (
+                        <div key={group.key} className="space-y-2.5">
+                          <div className="flex items-center justify-between gap-2 pb-1.5 border-b border-neutral-800/70">
+                            <div className="flex items-center gap-2 text-xs">
+                              <span className="font-bold text-amber-400 tracking-wide">{group.categoryLabel}</span>
+                              <span className="text-neutral-600">›</span>
+                              <span className="font-bold text-white">{group.submenuName}</span>
+                              <span className="font-mono text-neutral-500">({group.items.length})</span>
+                            </div>
+                            {group.categoryId && (
+                              <button
+                                onClick={() => handleStartNewItemIn(group.categoryId, group.submenuId)}
+                                className="cursor-pointer flex items-center gap-1 text-[11px] font-semibold text-amber-400 hover:text-amber-300"
+                              >
+                                <Plus className="w-3 h-3" />
+                                <span>이 분류에 추가</span>
+                              </button>
+                            )}
+                          </div>
+                          {group.items.length === 0 ? (
+                            <p className="text-[11px] text-neutral-500 pl-1">등록된 자료가 없습니다.</p>
+                          ) : (
+                            <div className="space-y-2">{group.items.map(renderItemRow)}</div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="space-y-3">{filteredItems.map(renderItemRow)}</div>
+                  )}
                 </div>
               ) : activeTab === 'categories' ? (
                 /* -------------------- 3. SUBMENU & CATEGORY MANAGEMENT -------------------- */
@@ -1243,7 +1440,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
 
                           {categories.length > 1 && (
                             <button
-                              onClick={() => handleDeleteCategory(cat.id)}
+                              onClick={() => handleDeleteCategory(cat.id, cat.label)}
                               className="cursor-pointer p-1.5 text-neutral-500 hover:text-red-400 rounded transition-colors"
                               title="카테고리 삭제"
                             >
@@ -1279,7 +1476,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                                   </div>
 
                                   <button
-                                    onClick={() => handleDeleteSubmenu(cat.id, sub.id)}
+                                    onClick={() => handleDeleteSubmenu(cat.id, sub.id, sub.name)}
                                     className="cursor-pointer p-1 text-neutral-500 hover:text-red-400 rounded"
                                     title="서브메뉴 삭제"
                                   >
@@ -1317,8 +1514,204 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                     ))}
                   </div>
                 </div>
+              ) : activeTab === 'about' ? (
+                /* -------------------- 4. HOME ABOUT CMS TAB -------------------- */
+                <form onSubmit={handleSaveAboutProfile} className="space-y-6 max-w-3xl mx-auto">
+                  <div className="pb-3 border-b border-neutral-800">
+                    <h3 className="font-['Outfit'] text-base font-bold text-white">
+                      Home 상단 About 소개 관리
+                    </h3>
+                    <p className="text-xs text-neutral-400">
+                      홈 첫 화면 상단의 제목, 소개 문구, 사진, 바이오, 핵심 분야, 성과 지표를 수정합니다. 수정 후 하단 [저장하기]를 눌러 적용하세요.
+                    </p>
+                  </div>
+
+                  {aboutFeedback && (
+                    <div
+                      className={`p-3 rounded-lg text-xs font-medium ${
+                        aboutFeedback.type === 'success'
+                          ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
+                          : 'bg-red-500/10 text-red-400 border border-red-500/30'
+                      }`}
+                    >
+                      {aboutFeedback.message}
+                    </div>
+                  )}
+
+                  {/* Headline & Intro */}
+                  <div className="space-y-4 p-4 rounded-xl bg-neutral-950/60 border border-neutral-800">
+                    <div className="text-xs font-bold text-amber-400">상단 제목 & 소개 문구</div>
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-semibold text-neutral-300">메인 제목 (Headline)</label>
+                      <textarea
+                        rows={2}
+                        value={aboutProfile.subtitle}
+                        onChange={(e) => setAboutProfile((p) => ({ ...p, subtitle: e.target.value }))}
+                        className={adminInputCls}
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-semibold text-neutral-300">
+                        소개 문단 (Intro) — "Welcome to the official portfolio of {aboutProfile.name || '이름'}." 뒤에 이어지는 문장
+                      </label>
+                      <textarea
+                        rows={3}
+                        value={aboutProfile.intro ?? DEFAULT_PROFILE.intro ?? ''}
+                        onChange={(e) => setAboutProfile((p) => ({ ...p, intro: e.target.value }))}
+                        className={adminInputCls}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Basic profile */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 rounded-xl bg-neutral-950/60 border border-neutral-800">
+                    <div className="sm:col-span-2 text-xs font-bold text-amber-400">기본 프로필</div>
+                    {(
+                      [
+                        ['name', '이름 (Name)'],
+                        ['title', '직함 (Title) — 프로필 사진 위 문구'],
+                        ['location', '지역 (Location)'],
+                        ['graduationYear', '졸업 연도 (Class of)']
+                      ] as const
+                    ).map(([key, label]) => (
+                      <div key={key} className="space-y-1.5">
+                        <label className="text-xs font-semibold text-neutral-300">{label}</label>
+                        <input
+                          type="text"
+                          value={aboutProfile[key] || ''}
+                          onChange={(e) => setAboutProfile((p) => ({ ...p, [key]: e.target.value }))}
+                          className={adminInputCls}
+                        />
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Photos */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 rounded-xl bg-neutral-950/60 border border-neutral-800">
+                    <div className="sm:col-span-2 text-xs font-bold text-amber-400">사진</div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-semibold text-neutral-300 block">인물 프로필 사진</label>
+                      <label className="cursor-pointer block relative aspect-square max-w-[180px] rounded-lg overflow-hidden border border-neutral-700 bg-neutral-900 group">
+                        <img src={aboutProfile.portraitImage || PORTRAIT_IMAGE} alt="portrait" className="w-full h-full object-cover" />
+                        <span className="absolute inset-0 flex items-center justify-center gap-1 bg-neutral-950/70 text-xs font-semibold text-white opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Upload className="w-3.5 h-3.5" /> 사진 변경
+                        </span>
+                        <input type="file" accept="image/*" className="hidden" onChange={(e) => handlePortraitUpload(e.target.files)} />
+                      </label>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-semibold text-neutral-300 block">수영 / 경기 사진</label>
+                      <label className="cursor-pointer block relative aspect-video max-w-[260px] rounded-lg overflow-hidden border border-neutral-700 bg-neutral-900 group">
+                        <img src={aboutProfile.swimmingImage || SWIMMING_IMAGE} alt="swimming" className="w-full h-full object-cover" />
+                        <span className="absolute inset-0 flex items-center justify-center gap-1 bg-neutral-950/70 text-xs font-semibold text-white opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Upload className="w-3.5 h-3.5" /> 사진 변경
+                        </span>
+                        <input type="file" accept="image/*" className="hidden" onChange={(e) => handleSwimmingUpload(e.target.files)} />
+                      </label>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={aboutProfile.swimmingCaption ?? DEFAULT_PROFILE.swimmingCaption ?? ''}
+                          onChange={(e) => setAboutProfile((p) => ({ ...p, swimmingCaption: e.target.value }))}
+                          placeholder="사진 하단 문구"
+                          className={adminInputCls}
+                        />
+                        <input
+                          type="text"
+                          value={aboutProfile.swimmingCaptionValue ?? DEFAULT_PROFILE.swimmingCaptionValue ?? ''}
+                          onChange={(e) => setAboutProfile((p) => ({ ...p, swimmingCaptionValue: e.target.value }))}
+                          placeholder="기록"
+                          className={`${adminInputCls} w-24 font-mono`}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Bio */}
+                  <div className="space-y-4 p-4 rounded-xl bg-neutral-950/60 border border-neutral-800">
+                    <div className="text-xs font-bold text-amber-400">바이오 (Biography)</div>
+                    {(
+                      [
+                        ['bio', '바이오 1 — 전체 소개'],
+                        ['bioGolf', '바이오 2 — 골프'],
+                        ['bioSwim', '바이오 3 — 수영']
+                      ] as const
+                    ).map(([key, label]) => (
+                      <div key={key} className="space-y-1.5">
+                        <label className="text-xs font-semibold text-neutral-300">{label}</label>
+                        <textarea
+                          rows={3}
+                          value={aboutProfile[key] ?? DEFAULT_PROFILE[key] ?? ''}
+                          onChange={(e) => setAboutProfile((p) => ({ ...p, [key]: e.target.value }))}
+                          className={adminInputCls}
+                        />
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Pillars */}
+                  <div className="space-y-3 p-4 rounded-xl bg-neutral-950/60 border border-neutral-800">
+                    <div className="text-xs font-bold text-amber-400">핵심 분야 카드 (4개)</div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {(aboutProfile.pillars && aboutProfile.pillars.length > 0
+                        ? aboutProfile.pillars
+                        : DEFAULT_PROFILE.pillars || []
+                      ).map((pillar, idx) => (
+                        <div key={pillar.id || idx} className="space-y-1.5 p-3 rounded-lg border border-neutral-800 bg-neutral-900/50">
+                          <input
+                            type="text"
+                            value={pillar.title}
+                            onChange={(e) => handleUpdateAboutPillar(idx, 'title', e.target.value)}
+                            placeholder="제목"
+                            className={`${adminInputCls} font-semibold`}
+                          />
+                          <textarea
+                            rows={2}
+                            value={pillar.description}
+                            onChange={(e) => handleUpdateAboutPillar(idx, 'description', e.target.value)}
+                            placeholder="설명"
+                            className={adminInputCls}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Metrics */}
+                  <div className="space-y-3 p-4 rounded-xl bg-neutral-950/60 border border-neutral-800">
+                    <div className="text-xs font-bold text-amber-400">하단 성과 지표 (4개)</div>
+                    <div className="space-y-2">
+                      {aboutProfile.metrics.map((m, idx) => (
+                        <div key={idx} className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                          <input type="text" value={m.label} onChange={(e) => handleUpdateAboutMetric(idx, 'label', e.target.value)} placeholder="항목명" className={adminInputCls} />
+                          <input type="text" value={m.value} onChange={(e) => handleUpdateAboutMetric(idx, 'value', e.target.value)} placeholder="값" className={`${adminInputCls} font-mono font-semibold`} />
+                          <input type="text" value={m.sublabel} onChange={(e) => handleUpdateAboutMetric(idx, 'sublabel', e.target.value)} placeholder="보조 설명" className={adminInputCls} />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-end gap-3 pt-4 border-t border-neutral-800">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAboutProfile(PortfolioStorage.getProfile());
+                        setAboutFeedback(null);
+                      }}
+                      className="cursor-pointer px-4 py-2.5 text-xs font-medium text-neutral-400 hover:text-white bg-neutral-800 rounded-lg transition-colors"
+                    >
+                      변경 취소
+                    </button>
+                    <button
+                      type="submit"
+                      className="cursor-pointer px-6 py-2.5 text-xs font-bold text-neutral-950 bg-amber-500 hover:bg-amber-400 rounded-lg transition-colors shadow-lg shadow-amber-500/10"
+                    >
+                      저장하기
+                    </button>
+                  </div>
+                </form>
               ) : (
-                /* -------------------- 4. SETTINGS TAB -------------------- */
+                /* -------------------- 5. SETTINGS TAB -------------------- */
                 <div className="space-y-6 max-w-xl mx-auto">
                   {/* Change Password */}
                   <div className="p-6 rounded-xl border border-neutral-800 bg-neutral-950/60 space-y-4">
@@ -1373,6 +1766,14 @@ export const AdminModal: React.FC<AdminModalProps> = ({
           </div>
         )}
       </div>
+
+      <ConfirmDialog
+        isOpen={deleteConfirm.isOpen}
+        title={deleteConfirm.title}
+        description={deleteConfirm.description}
+        onConfirm={deleteConfirm.onConfirm}
+        onCancel={closeDeleteConfirm}
+      />
     </div>
   );
 };

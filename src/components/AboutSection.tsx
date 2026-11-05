@@ -1,7 +1,7 @@
 import React from 'react';
 import { Trophy, Target, BookOpen, Heart, Play, ArrowDown } from 'lucide-react';
 import { SiteProfile, PortfolioItem } from '../types/portfolio';
-import { PORTRAIT_IMAGE, SWIMMING_IMAGE } from '../services/storage';
+import { PORTRAIT_IMAGE, SWIMMING_IMAGE, DEFAULT_PROFILE } from '../services/storage';
 
 interface AboutSectionProps {
   profile: SiteProfile;
@@ -36,8 +36,8 @@ export const AboutSection: React.FC<AboutSectionProps> = ({
             {profile.subtitle || 'Dedication Across Disciplines: Precision on the Course, Power in the Pool.'}
           </h1>
           <p className="text-neutral-300 text-sm sm:text-lg mt-4 leading-relaxed">
-            Welcome to the official portfolio of <strong className="text-white font-semibold">{profile.name}</strong>. 
-            Pursuing athletic mastery on the fairway and in the pool, grounded by rigorous STEM biomechanics inquiry, academic excellence, and youth community service.
+            Welcome to the official portfolio of <strong className="text-white font-semibold">{profile.name}</strong>.{' '}
+            {profile.intro ?? DEFAULT_PROFILE.intro}
           </p>
         </div>
 
@@ -86,8 +86,8 @@ export const AboutSection: React.FC<AboutSectionProps> = ({
               />
               <div className="absolute inset-0 bg-gradient-to-t from-neutral-950/80 via-transparent to-transparent" />
               <div className="absolute bottom-3 left-4 right-4 flex items-center justify-between text-xs">
-                <span className="text-white font-medium">CIF State Finalist · 100m Butterfly</span>
-                <span className="text-amber-400 font-mono font-bold">50.82s</span>
+                <span className="text-white font-medium">{profile.swimmingCaption ?? DEFAULT_PROFILE.swimmingCaption}</span>
+                <span className="text-amber-400 font-mono font-bold">{profile.swimmingCaptionValue ?? DEFAULT_PROFILE.swimmingCaptionValue}</span>
               </div>
             </div>
           </div>

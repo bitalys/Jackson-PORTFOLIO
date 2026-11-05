@@ -58,6 +58,7 @@ export const DEFAULT_PROFILE: SiteProfile = {
   name: 'Jackson Hong',
   title: 'Competitive Scholar-Athlete',
   subtitle: 'Dedication Across Disciplines: Precision on the Course, Power in the Pool.',
+  intro: 'Pursuing athletic mastery on the fairway and in the pool, grounded by rigorous STEM biomechanics inquiry, academic excellence, and youth community service.',
   bio: 'Jackson Hong is a dedicated student-athlete focused on tournament golf and sprint butterfly swimming. Combining rigorous physical discipline with academic excellence in physics and biomechanics, Jackson strives for peak performance on the course, in the water, and in the classroom.',
   bioGolf: 'As a tournament golfer, Jackson competes across AJGA, Toyota Tour Cup, and SCPGA Junior championships, refining a consistent +1.4 index with a focus on course management, pressure putting, and kinematic swing efficiency.',
   bioSwim: 'Concurrently, as an All-State varsity swimmer, Jackson anchors the sprint butterfly and medley relays, bringing high-intensity physical conditioning and explosive athletic speed that translates directly into clubhead velocity on the golf course.',
@@ -66,6 +67,8 @@ export const DEFAULT_PROFILE: SiteProfile = {
   gpa: '3.96 Unweighted / 4.42 Weighted',
   portraitImage: PORTRAIT_IMAGE,
   swimmingImage: SWIMMING_IMAGE,
+  swimmingCaption: 'CIF State Finalist · 100m Butterfly',
+  swimmingCaptionValue: '50.82s',
   email: 'jackson.hong.athletics@gmail.com',
   phone: '+1 (949) 555-0182',
   socials: {
