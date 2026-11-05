@@ -21,7 +21,12 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
   isAdmin,
   onEditItem
 }) => {
-  const [activeMediaTab, setActiveMediaTab] = useState<'video' | 'gallery'>('video');
+  const [activeMediaTab, setActiveMediaTab] = useState<'video' | 'gallery'>(() => {
+    if (!item || item.mediaType === 'image' || !item.youtubeVideoId) {
+      return 'gallery';
+    }
+    return 'video';
+  });
   const [selectedImageIndex, setSelectedImageIndex] = useState<number>(0);
 
   // Keyboard navigation & escape listener
@@ -42,13 +47,13 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [item, items]);
 
-  // Sync media tab when item changes
+  // Sync media tab when item changes: default to gallery when mediaType is 'image'
   useEffect(() => {
     if (item) {
-      if (item.youtubeVideoId) {
-        setActiveMediaTab('video');
-      } else {
+      if (item.mediaType === 'image' || !item.youtubeVideoId) {
         setActiveMediaTab('gallery');
+      } else {
+        setActiveMediaTab('video');
       }
       setSelectedImageIndex(0);
     }
@@ -62,8 +67,10 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
   const categoryLabel = category?.label || item.categoryId.toUpperCase();
   const submenuLabel = submenu?.name || item.submenuId;
 
-  // Image list
-  const allImages = [item.coverImage, ...(item.galleryImages || [])].filter(Boolean);
+  // Image list - strictly deduplicated so cover image is never duplicated
+  const allImages = Array.from(
+    new Set([item.coverImage, ...(item.galleryImages || [])].filter(Boolean))
+  );
 
   // Prev / Next index
   const currentIndex = items.findIndex((i) => i.id === item.id);
@@ -179,7 +186,7 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                       : 'text-neutral-400 hover:text-white bg-neutral-800'
                   }`}
                 >
-                  사진 갤러리 ({allImages.length})
+                  대회 사진 갤러리 ({allImages.length})
                 </button>
               </div>
             )}

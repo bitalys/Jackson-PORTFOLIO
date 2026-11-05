@@ -24,12 +24,29 @@ export const ItemThirdPage: React.FC<ItemThirdPageProps> = ({
   onEditItem,
   onOpenModal
 }) => {
-  const [activeMediaTab, setActiveMediaTab] = useState<'video' | 'gallery'>('video');
+  // Find item
+  const item = items.find((i) => i.id === itemId);
+
+  const [activeMediaTab, setActiveMediaTab] = useState<'video' | 'gallery'>(() => {
+    if (!item || item.mediaType === 'image' || !item.youtubeVideoId) {
+      return 'gallery';
+    }
+    return 'video';
+  });
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState(0);
   const [copied, setCopied] = useState(false);
 
-  // Find item
-  const item = items.find((i) => i.id === itemId);
+  // Sync active media tab when item changes: photo gallery is default for image-focused items
+  React.useEffect(() => {
+    if (item) {
+      if (item.mediaType === 'image' || !item.youtubeVideoId) {
+        setActiveMediaTab('gallery');
+      } else {
+        setActiveMediaTab('video');
+      }
+      setSelectedPhotoIndex(0);
+    }
+  }, [item]);
 
   if (!item) {
     return (
@@ -56,8 +73,10 @@ export const ItemThirdPage: React.FC<ItemThirdPageProps> = ({
   const categoryLabel = category?.label || item.categoryId.toUpperCase();
   const submenuLabel = submenu?.name || item.submenuId;
 
-  // Image list
-  const allImages = [item.coverImage, ...(item.galleryImages || [])].filter(Boolean);
+  // Image list - strictly deduplicated so cover image is never duplicated
+  const allImages = Array.from(
+    new Set([item.coverImage, ...(item.galleryImages || [])].filter(Boolean))
+  );
 
   // Related items in the same sub-page / category
   const relatedItems = items

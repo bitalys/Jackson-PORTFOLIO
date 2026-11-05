@@ -142,8 +142,13 @@ export const AdminModal: React.FC<AdminModalProps> = ({
     setDate(item.date);
     setFeatured(item.featured);
     setMediaType(item.mediaType);
-    setCoverImage(item.coverImage);
-    setGalleryImages(item.galleryImages || []);
+
+    // Unify all existing images and deduplicate so cover is never duplicated in gallery
+    const allImgs = Array.from(new Set([item.coverImage, ...(item.galleryImages || [])].filter(Boolean)));
+    const defaultCover = item.coverImage || (allImgs.length > 0 ? allImgs[0] : '');
+    setCoverImage(defaultCover);
+    setGalleryImages(allImgs);
+
     setYoutubeUrl(item.youtubeUrl || '');
     setYoutubeVideoId(item.youtubeVideoId || '');
     setSummary(item.summary);
@@ -157,19 +162,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
     setIsEditing(true);
   };
 
-  // Handle Computer Folder File Upload (Cover Photo)
-  const handleCoverFileUpload = async (files: FileList | null) => {
-    if (!files || files.length === 0) return;
-    try {
-      const file = files[0];
-      const dataUrl = await readFileAsDataUrl(file);
-      setCoverImage(dataUrl);
-    } catch {
-      alert('이미지 파일을 읽는 중 오류가 발생했습니다.');
-    }
-  };
-
-  // Handle Multiple Computer Folder File Uploads (Gallery)
+  // Handle Computer Folder File Uploads (Gallery & Cover)
   const handleGalleryFilesUpload = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
     try {
@@ -178,10 +171,21 @@ export const AdminModal: React.FC<AdminModalProps> = ({
         const dataUrl = await readFileAsDataUrl(files[i]);
         urls.push(dataUrl);
       }
-      setGalleryImages((prev) => [...prev, ...urls]);
-      if (!coverImage && urls.length > 0) {
-        setCoverImage(urls[0]);
-      }
+      
+      setGalleryImages((prev) => {
+        const combined = Array.from(new Set([...prev, ...urls]));
+        // When one or more photos are registered, default the very first photo as the cover photo!
+        setCoverImage((currentCover) => {
+          if (!currentCover && combined.length > 0) {
+            return combined[0];
+          }
+          if (prev.length === 0 && combined.length > 0) {
+            return combined[0];
+          }
+          return currentCover || combined[0];
+        });
+        return combined;
+      });
     } catch {
       alert('갤러리 이미지를 읽는 중 오류가 발생했습니다.');
     }
@@ -219,6 +223,11 @@ export const AdminModal: React.FC<AdminModalProps> = ({
 
     const cleanedHighlights = highlights.filter((h) => h.label.trim() && h.value.trim());
 
+    // When one or more photos exist, default the first photo as the cover if not set
+    const finalCover = coverImage || (galleryImages.length > 0 ? galleryImages[0] : '');
+    // Gallery images should not duplicate the cover image
+    const finalGallery = galleryImages.filter((img) => img !== finalCover);
+
     try {
       if (editItemId) {
         await PortfolioStorage.updateItem(editItemId, {
@@ -229,8 +238,8 @@ export const AdminModal: React.FC<AdminModalProps> = ({
           date,
           featured,
           mediaType,
-          coverImage,
-          galleryImages,
+          coverImage: finalCover,
+          galleryImages: finalGallery,
           youtubeUrl,
           youtubeVideoId,
           summary,
@@ -249,8 +258,8 @@ export const AdminModal: React.FC<AdminModalProps> = ({
           date: date || new Date().getFullYear().toString(),
           featured,
           mediaType,
-          coverImage,
-          galleryImages,
+          coverImage: finalCover,
+          galleryImages: finalGallery,
           youtubeUrl,
           youtubeVideoId,
           summary,
@@ -764,7 +773,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                         </label>
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                           {galleryImages.map((img, idx) => {
-                            const isCover = coverImage === img;
+                            const isCover = coverImage ? coverImage === img : idx === 0;
                             return (
                               <div
                                 key={idx}

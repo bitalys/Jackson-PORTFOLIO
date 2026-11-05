@@ -88,7 +88,7 @@ export const DEFAULT_ITEMS: PortfolioItem[] = [
     featured: true,
     mediaType: 'both',
     coverImage: HERO_GOLF_IMAGE,
-    galleryImages: [HERO_GOLF_IMAGE, PORTRAIT_IMAGE],
+    galleryImages: [PORTRAIT_IMAGE],
     youtubeUrl: 'https://www.youtube.com/watch?v=rh1x18eIhco',
     youtubeVideoId: 'rh1x18eIhco',
     summary: 'Carded a 4-under par final round 68 under difficult coastal wind conditions to capture 2nd place overall against top-tier national juniors.',
@@ -114,7 +114,7 @@ export const DEFAULT_ITEMS: PortfolioItem[] = [
     featured: true,
     mediaType: 'image',
     coverImage: SWIMMING_IMAGE,
-    galleryImages: [SWIMMING_IMAGE],
+    galleryImages: [],
     youtubeUrl: '',
     youtubeVideoId: '',
     summary: 'Claimed 1st place in the CIF Division 1 championship with a new school record of 50.82 seconds in the 100m Butterfly.',
@@ -166,7 +166,7 @@ export const DEFAULT_ITEMS: PortfolioItem[] = [
     featured: false,
     mediaType: 'image',
     coverImage: PORTRAIT_IMAGE,
-    galleryImages: [PORTRAIT_IMAGE],
+    galleryImages: [],
     youtubeUrl: '',
     youtubeVideoId: '',
     summary: 'Engineered an AI pose estimation system to analyze pelvic and shoulder rotational velocities, correlating thoracic separation angle with launch efficiency.',
@@ -192,7 +192,7 @@ export const DEFAULT_ITEMS: PortfolioItem[] = [
     featured: false,
     mediaType: 'image',
     coverImage: PORTRAIT_IMAGE,
-    galleryImages: [PORTRAIT_IMAGE],
+    galleryImages: [],
     youtubeUrl: '',
     youtubeVideoId: '',
     summary: 'Organized and led weekend golf clinics and youth swim safety workshops for over 65 local elementary and middle school students.',
@@ -376,12 +376,18 @@ export const PortfolioStorage = {
         cover = PORTRAIT_IMAGE;
       }
 
-      const gallery = (item.galleryImages || []).map(img => {
-        if (!img || img.includes('jackson_hero_golf')) return HERO_GOLF_IMAGE;
-        if (img.includes('jackson_swimming_action')) return SWIMMING_IMAGE;
-        if (img.includes('jackson_portrait_headshot')) return PORTRAIT_IMAGE;
-        return img;
-      });
+      const gallery = Array.from(
+        new Set(
+          (item.galleryImages || [])
+            .map(img => {
+              if (!img || img.includes('jackson_hero_golf')) return HERO_GOLF_IMAGE;
+              if (img.includes('jackson_swimming_action')) return SWIMMING_IMAGE;
+              if (img.includes('jackson_portrait_headshot')) return PORTRAIT_IMAGE;
+              return img;
+            })
+            .filter(img => Boolean(img) && img !== cover)
+        )
+      );
 
       // Update old un-embeddable Rick Astley test video ID to verified USGA Junior Championship video
       let youtubeId = item.youtubeVideoId;
