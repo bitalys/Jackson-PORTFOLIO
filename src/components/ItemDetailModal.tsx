@@ -186,14 +186,29 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
 
             {/* Video View */}
             {item.youtubeVideoId && activeMediaTab === 'video' && (
-              <div className="relative aspect-video w-full rounded-xl overflow-hidden bg-black border border-neutral-800 shadow-xl">
-                <iframe
-                  src={`https://www.youtube-nocookie.com/embed/${item.youtubeVideoId}?autoplay=1&rel=0`}
-                  title={item.title}
-                  className="w-full h-full border-0"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                  allowFullScreen
-                />
+              <div className="space-y-2">
+                <div className="relative aspect-video w-full rounded-xl overflow-hidden bg-black border border-neutral-800 shadow-xl">
+                  <iframe
+                    src={`https://www.youtube.com/embed/${item.youtubeVideoId}?rel=0&enablejsapi=1`}
+                    title={item.title}
+                    className="w-full h-full border-0"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                    referrerPolicy="strict-origin-when-cross-origin"
+                    allowFullScreen
+                  />
+                </div>
+                <div className="flex items-center justify-between text-xs text-neutral-400 px-1">
+                  <span>영상이 브라우저 설정으로 인해 재생되지 않는 경우:</span>
+                  <a
+                    href={item.youtubeUrl || `https://www.youtube.com/watch?v=${item.youtubeVideoId}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-red-400 hover:text-red-300 font-semibold flex items-center gap-1 hover:underline"
+                  >
+                    <Play className="w-3 h-3 fill-current" />
+                    <span>YouTube에서 직접 열기</span>
+                  </a>
+                </div>
               </div>
             )}
 
@@ -206,6 +221,12 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                     alt={`${item.title} media ${selectedImageIndex + 1}`}
                     className="max-h-[500px] w-auto max-w-full object-contain mx-auto"
                     referrerPolicy="no-referrer"
+                    onError={(e) => {
+                      const target = e.currentTarget;
+                      if (!target.src.includes('hero_golf')) {
+                        target.src = '/images/hero_golf.jpg';
+                      }
+                    }}
                   />
                 </div>
 

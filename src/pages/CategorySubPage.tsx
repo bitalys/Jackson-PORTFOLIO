@@ -251,6 +251,13 @@ export const CategorySubPage: React.FC<CategorySubPageProps> = ({
                         src={item.coverImage}
                         alt={item.title}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                        referrerPolicy="no-referrer"
+                        onError={(e) => {
+                          const target = e.currentTarget;
+                          if (!target.src.includes('hero_golf')) {
+                            target.src = '/images/hero_golf.jpg';
+                          }
+                        }}
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-neutral-600">
@@ -336,6 +343,13 @@ export const CategorySubPage: React.FC<CategorySubPageProps> = ({
                       src={item.coverImage}
                       alt={item.title}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out"
+                      referrerPolicy="no-referrer"
+                      onError={(e) => {
+                        const target = e.currentTarget;
+                        if (!target.src.includes('hero_golf')) {
+                          target.src = '/images/hero_golf.jpg';
+                        }
+                      }}
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-neutral-600">

@@ -79,15 +79,23 @@ export const Hero: React.FC<HeroProps> = ({
           </div>
 
           {/* Right Column: Hero Visual Container at Matching Height */}
-          <div className="lg:col-span-5 relative flex flex-col">
-            <div className="relative w-full h-full min-h-[380px] sm:min-h-[460px] rounded-2xl overflow-hidden border border-neutral-800 bg-neutral-900 group">
+          <div className="lg:col-span-5 relative flex flex-col justify-stretch">
+            <div className="relative w-full flex-1 min-h-[380px] sm:min-h-[460px] rounded-2xl overflow-hidden border border-neutral-800 bg-neutral-900 group">
               <img
                 src={HERO_GOLF_IMAGE}
                 alt="Jackson Hong tournament golf swing follow-through"
-                className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-700 ease-out"
+                className="absolute inset-0 w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-700 ease-out"
+                loading="eager"
+                decoding="async"
                 referrerPolicy="no-referrer"
+                onError={(e) => {
+                  const target = e.currentTarget;
+                  if (target.src !== '/images/hero_golf.jpg') {
+                    target.src = '/images/hero_golf.jpg';
+                  }
+                }}
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-neutral-950/90 via-neutral-950/20 to-transparent" />
+              <div className="absolute inset-0 bg-gradient-to-t from-neutral-950/90 via-neutral-950/20 to-transparent pointer-events-none" />
 
               {/* Floating Action / Metric Overlay */}
               <div className="absolute bottom-5 left-5 right-5 p-4 rounded-xl bg-neutral-950/80 backdrop-blur-md border border-neutral-800 flex items-center justify-between">

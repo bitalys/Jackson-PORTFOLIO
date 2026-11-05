@@ -1,9 +1,12 @@
 import { Category, PortfolioItem, SiteProfile, Submenu } from '../types/portfolio';
+import heroGolfAsset from '../assets/images/jackson_hero_golf_1793837637636.jpg';
+import swimmingAsset from '../assets/images/jackson_swimming_action_1793837638448.jpg';
+import portraitAsset from '../assets/images/jackson_portrait_headshot_1793837638258.jpg';
 
-// Generated image assets from batch generation
-export const HERO_GOLF_IMAGE = '/src/assets/images/jackson_hero_golf_1793837637636.jpg';
-export const SWIMMING_IMAGE = '/src/assets/images/jackson_swimming_action_1793837638448.jpg';
-export const PORTRAIT_IMAGE = '/src/assets/images/jackson_portrait_headshot_1793837638258.jpg';
+// Bundled and static image asset paths
+export const HERO_GOLF_IMAGE = heroGolfAsset || '/images/hero_golf.jpg';
+export const SWIMMING_IMAGE = swimmingAsset || '/images/swimming.jpg';
+export const PORTRAIT_IMAGE = portraitAsset || '/images/portrait.jpg';
 
 const DB_NAME = 'JacksonHongPortfolioDB';
 const DB_VERSION = 1;
@@ -17,6 +20,7 @@ const LOCAL_STORAGE_PASSWORD_KEY = 'jh_admin_pwd_v1';
 const LOCAL_STORAGE_PROFILE_KEY = 'jh_portfolio_profile_v1';
 
 export const DEFAULT_ADMIN_PASSWORD = '1111';
+
 
 // Initial Categories with ATHLETICS · GOLF, ATHLETICS · Swimming, etc.
 export const DEFAULT_CATEGORIES: Category[] = [
@@ -85,8 +89,8 @@ export const DEFAULT_ITEMS: PortfolioItem[] = [
     mediaType: 'both',
     coverImage: HERO_GOLF_IMAGE,
     galleryImages: [HERO_GOLF_IMAGE, PORTRAIT_IMAGE],
-    youtubeUrl: 'https://www.youtube.com/watch?v=ScMzIvxBSi4',
-    youtubeVideoId: 'ScMzIvxBSi4',
+    youtubeUrl: 'https://www.youtube.com/watch?v=rh1x18eIhco',
+    youtubeVideoId: 'rh1x18eIhco',
     summary: 'Carded a 4-under par final round 68 under difficult coastal wind conditions to capture 2nd place overall against top-tier national juniors.',
     details: 'The AJGA Junior Championship brought together 78 elite junior golfers across the Western conference. Jackson maintained steady ball striking hitting 14 of 18 greens in regulation during Sunday\'s final round, punctuated by an eagle on the 14th hole. The tournament demonstrated maturity in course management, emotional poise, and short game recovery around tight oceanfront greens.',
     highlights: [
@@ -137,8 +141,8 @@ export const DEFAULT_ITEMS: PortfolioItem[] = [
     mediaType: 'youtube',
     coverImage: HERO_GOLF_IMAGE,
     galleryImages: [],
-    youtubeUrl: 'https://www.youtube.com/watch?v=ScMzIvxBSi4',
-    youtubeVideoId: 'ScMzIvxBSi4',
+    youtubeUrl: 'https://www.youtube.com/watch?v=OQsQQk-n-7A',
+    youtubeVideoId: 'OQsQQk-n-7A',
     summary: 'Full tournament recap showcasing driver launch angles, wedge distance control, and clutch par saves in high-pressure match situations.',
     details: 'Video compilation featuring Jackson\'s swing mechanics, tee shot dispersion on long par 4s, and key putts throughout the two-day 36-hole event at Torrey Pines. Detailed trackman data verified an average clubhead speed of 114 mph and ball speed exceeding 168 mph.',
     highlights: [
@@ -362,6 +366,45 @@ export const PortfolioStorage = {
 
   // Get All Portfolio Items
   async getItems(): Promise<PortfolioItem[]> {
+    const normalizeMedia = (item: PortfolioItem): PortfolioItem => {
+      let cover = item.coverImage;
+      if (!cover || cover.includes('jackson_hero_golf')) {
+        cover = HERO_GOLF_IMAGE;
+      } else if (cover.includes('jackson_swimming_action')) {
+        cover = SWIMMING_IMAGE;
+      } else if (cover.includes('jackson_portrait_headshot')) {
+        cover = PORTRAIT_IMAGE;
+      }
+
+      const gallery = (item.galleryImages || []).map(img => {
+        if (!img || img.includes('jackson_hero_golf')) return HERO_GOLF_IMAGE;
+        if (img.includes('jackson_swimming_action')) return SWIMMING_IMAGE;
+        if (img.includes('jackson_portrait_headshot')) return PORTRAIT_IMAGE;
+        return img;
+      });
+
+      // Update old un-embeddable Rick Astley test video ID to verified USGA Junior Championship video
+      let youtubeId = item.youtubeVideoId;
+      let youtubeUrl = item.youtubeUrl;
+      if (youtubeId === 'ScMzIvxBSi4') {
+        if (item.id === 'item-golf-1') {
+          youtubeId = 'rh1x18eIhco';
+          youtubeUrl = 'https://www.youtube.com/watch?v=rh1x18eIhco';
+        } else {
+          youtubeId = 'OQsQQk-n-7A';
+          youtubeUrl = 'https://www.youtube.com/watch?v=OQsQQk-n-7A';
+        }
+      }
+
+      return {
+        ...item,
+        coverImage: cover,
+        galleryImages: gallery,
+        youtubeVideoId: youtubeId,
+        youtubeUrl
+      };
+    };
+
     try {
       const db = await openDatabase();
       const tx = db.transaction(STORE_ITEMS, 'readonly');
@@ -373,7 +416,7 @@ export const PortfolioStorage = {
       });
 
       if (result && result.length > 0) {
-        return result.sort((a, b) => b.createdAt - a.createdAt);
+        return result.map(normalizeMedia).sort((a, b) => b.createdAt - a.createdAt);
       }
     } catch {
       // Fallback
@@ -383,7 +426,7 @@ export const PortfolioStorage = {
     if (local) {
       try {
         const parsed = JSON.parse(local);
-        if (parsed.length > 0) return parsed.sort((a: PortfolioItem, b: PortfolioItem) => b.createdAt - a.createdAt);
+        if (parsed.length > 0) return parsed.map(normalizeMedia).sort((a: PortfolioItem, b: PortfolioItem) => b.createdAt - a.createdAt);
       } catch {
         // ignore
       }

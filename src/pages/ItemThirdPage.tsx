@@ -208,14 +208,29 @@ export const ItemThirdPage: React.FC<ItemThirdPageProps> = ({
 
         {/* Video Player Embed */}
         {item.youtubeVideoId && activeMediaTab === 'video' ? (
-          <div className="relative aspect-video w-full rounded-2xl overflow-hidden bg-black border border-neutral-800 shadow-2xl">
-            <iframe
-              src={`https://www.youtube-nocookie.com/embed/${item.youtubeVideoId}?autoplay=1&rel=0`}
-              title={item.title}
-              className="w-full h-full border-0"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
-            />
+          <div className="space-y-2">
+            <div className="relative aspect-video w-full rounded-2xl overflow-hidden bg-black border border-neutral-800 shadow-2xl">
+              <iframe
+                src={`https://www.youtube.com/embed/${item.youtubeVideoId}?rel=0&enablejsapi=1`}
+                title={item.title}
+                className="w-full h-full border-0"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                referrerPolicy="strict-origin-when-cross-origin"
+                allowFullScreen
+              />
+            </div>
+            <div className="flex items-center justify-between text-xs text-neutral-400 px-1">
+              <span>영상이 브라우저 보안 또는 서드파티 제한으로 재생되지 않을 경우:</span>
+              <a
+                href={item.youtubeUrl || `https://www.youtube.com/watch?v=${item.youtubeVideoId}`}
+                target="_blank"
+                rel="noreferrer"
+                className="text-red-400 hover:text-red-300 font-semibold flex items-center gap-1 hover:underline"
+              >
+                <Play className="w-3.5 h-3.5 fill-current" />
+                <span>YouTube에서 직접 보기</span>
+              </a>
+            </div>
           </div>
         ) : allImages.length > 0 ? (
           /* High-res Image Showcase */
@@ -228,6 +243,13 @@ export const ItemThirdPage: React.FC<ItemThirdPageProps> = ({
                 src={allImages[selectedPhotoIndex] || allImages[0]}
                 alt={`${item.title} preview`}
                 className="max-h-[640px] w-auto max-w-full object-contain mx-auto group-hover:scale-[1.01] transition-transform"
+                referrerPolicy="no-referrer"
+                onError={(e) => {
+                  const target = e.currentTarget;
+                  if (!target.src.includes('hero_golf')) {
+                    target.src = '/images/hero_golf.jpg';
+                  }
+                }}
               />
               <div className="absolute bottom-4 right-4 px-3 py-1.5 rounded-lg bg-neutral-950/80 border border-neutral-700 text-xs text-neutral-200">
                 클릭하여 팝업으로 크게 보기

@@ -682,13 +682,23 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                           </span>
                           <div className="relative aspect-video max-w-md rounded-lg overflow-hidden border border-neutral-800 bg-black">
                             <iframe
-                              src={`https://www.youtube-nocookie.com/embed/${youtubeVideoId}`}
+                              src={`https://www.youtube.com/embed/${youtubeVideoId}?rel=0`}
                               title="YouTube Preview"
                               className="w-full h-full border-0"
-                              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                              referrerPolicy="strict-origin-when-cross-origin"
                               allowFullScreen
                             />
                           </div>
+                          <a
+                            href={`https://www.youtube.com/watch?v=${youtubeVideoId}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-[11px] text-red-400 hover:text-red-300 font-semibold inline-flex items-center gap-1"
+                          >
+                            <Film className="w-3 h-3" />
+                            <span>YouTube 새 탭에서 확인</span>
+                          </a>
                         </div>
                       ) : youtubeUrl ? (
                         <p className="text-[11px] text-amber-400">

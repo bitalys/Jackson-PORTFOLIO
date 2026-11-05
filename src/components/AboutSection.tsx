@@ -36,8 +36,14 @@ export const AboutSection: React.FC<AboutSectionProps> = ({ profile }) => {
                 alt={profile.name}
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                 referrerPolicy="no-referrer"
+                onError={(e) => {
+                  const target = e.currentTarget;
+                  if (!target.src.includes('portrait')) {
+                    target.src = '/images/portrait.jpg';
+                  }
+                }}
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-neutral-950/80 via-transparent to-transparent" />
+              <div className="absolute inset-0 bg-gradient-to-t from-neutral-950/80 via-transparent to-transparent pointer-events-none" />
               <div className="absolute bottom-4 left-4 right-4">
                 <span className="text-xs font-bold text-amber-400 uppercase tracking-widest block">
                   {profile.title}
@@ -56,6 +62,12 @@ export const AboutSection: React.FC<AboutSectionProps> = ({ profile }) => {
                 alt="Jackson Hong swimming 100m Butterfly"
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                 referrerPolicy="no-referrer"
+                onError={(e) => {
+                  const target = e.currentTarget;
+                  if (!target.src.includes('swimming')) {
+                    target.src = '/images/swimming.jpg';
+                  }
+                }}
               />
               <div className="absolute inset-0 bg-gradient-to-t from-neutral-950/80 via-transparent to-transparent" />
               <div className="absolute bottom-3 left-4 right-4 flex items-center justify-between text-xs">

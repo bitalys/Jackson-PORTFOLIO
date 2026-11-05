@@ -75,7 +75,10 @@ export const PortfolioGrid: React.FC<PortfolioGridProps> = ({
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     referrerPolicy="no-referrer"
                     onError={(e) => {
-                      (e.target as HTMLElement).style.display = 'none';
+                      const target = e.currentTarget;
+                      if (!target.src.includes('hero_golf')) {
+                        target.src = '/images/hero_golf.jpg';
+                      }
                     }}
                   />
                 ) : (
@@ -198,7 +201,10 @@ export const PortfolioGrid: React.FC<PortfolioGridProps> = ({
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out"
                   referrerPolicy="no-referrer"
                   onError={(e) => {
-                    (e.target as HTMLElement).style.display = 'none';
+                    const target = e.currentTarget;
+                    if (!target.src.includes('hero_golf')) {
+                      target.src = '/images/hero_golf.jpg';
+                    }
                   }}
                 />
               ) : (
