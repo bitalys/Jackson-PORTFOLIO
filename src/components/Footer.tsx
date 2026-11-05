@@ -18,6 +18,32 @@ export const Footer: React.FC<FooterProps> = ({
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  const handleAboutClick = () => {
+    const el = document.getElementById('about');
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth' });
+    } else {
+      navigateTo({ page: 'home' });
+      setTimeout(() => {
+        const target = document.getElementById('about');
+        if (target) target.scrollIntoView({ behavior: 'smooth' });
+      }, 100);
+    }
+  };
+
+  const handleContactClick = () => {
+    const el = document.getElementById('contact');
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth' });
+    } else {
+      navigateTo({ page: 'home' });
+      setTimeout(() => {
+        const target = document.getElementById('contact');
+        if (target) target.scrollIntoView({ behavior: 'smooth' });
+      }, 100);
+    }
+  };
+
   return (
     <footer className="bg-neutral-950 border-t border-neutral-900 py-12 text-xs text-neutral-400">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -62,13 +88,13 @@ export const Footer: React.FC<FooterProps> = ({
               Leadership
             </button>
             <button
-              onClick={() => navigateTo({ page: 'about' })}
+              onClick={handleAboutClick}
               className="cursor-pointer hover:text-white transition-colors"
             >
               About
             </button>
             <button
-              onClick={() => navigateTo({ page: 'contact' })}
+              onClick={handleContactClick}
               className="cursor-pointer hover:text-white transition-colors"
             >
               Contact

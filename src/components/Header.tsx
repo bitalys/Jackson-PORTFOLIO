@@ -24,6 +24,40 @@ export const Header: React.FC<HeaderProps> = ({
     return currentRoute.page === 'category' && currentRoute.categoryId === categoryId;
   };
 
+  // Navigate to About section on Home
+  const handleAboutClick = () => {
+    if (currentRoute.page === 'home') {
+      const el = document.getElementById('about');
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth' });
+      } else {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    } else {
+      navigateTo({ page: 'home' });
+      setTimeout(() => {
+        const el = document.getElementById('about');
+        if (el) el.scrollIntoView({ behavior: 'smooth' });
+      }, 100);
+    }
+  };
+
+  // Navigate to Contact section on Home
+  const handleContactClick = () => {
+    if (currentRoute.page === 'home') {
+      const el = document.getElementById('contact');
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth' });
+      }
+    } else {
+      navigateTo({ page: 'home' });
+      setTimeout(() => {
+        const el = document.getElementById('contact');
+        if (el) el.scrollIntoView({ behavior: 'smooth' });
+      }, 100);
+    }
+  };
+
   return (
     <header className="sticky top-0 z-40 w-full bg-neutral-950/95 backdrop-blur-md border-b border-neutral-800/80 transition-colors">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-18 flex items-center justify-between gap-6">
@@ -130,26 +164,18 @@ export const Header: React.FC<HeaderProps> = ({
             );
           })}
 
-          {/* About Sub-Page Link */}
+          {/* About Link - navigates to Home's About section */}
           <button
-            onClick={() => navigateTo({ page: 'about' })}
-            className={`cursor-pointer whitespace-nowrap shrink-0 transition-colors pb-1 border-b-2 ${
-              currentRoute.page === 'about'
-                ? 'text-white border-amber-400 font-semibold'
-                : 'border-transparent hover:text-white'
-            }`}
+            onClick={handleAboutClick}
+            className="cursor-pointer whitespace-nowrap shrink-0 transition-colors pb-1 border-b-2 border-transparent text-neutral-300 hover:text-white hover:border-amber-400"
           >
             About
           </button>
 
-          {/* Contact Sub-Page Link */}
+          {/* Contact Link - navigates to Home's Contact section */}
           <button
-            onClick={() => navigateTo({ page: 'contact' })}
-            className={`cursor-pointer whitespace-nowrap shrink-0 transition-colors pb-1 border-b-2 ${
-              currentRoute.page === 'contact'
-                ? 'text-white border-amber-400 font-semibold'
-                : 'border-transparent hover:text-white'
-            }`}
+            onClick={handleContactClick}
+            className="cursor-pointer whitespace-nowrap shrink-0 transition-colors pb-1 border-b-2 border-transparent text-neutral-300 hover:text-white hover:border-amber-400"
           >
             Contact
           </button>
@@ -239,19 +265,19 @@ export const Header: React.FC<HeaderProps> = ({
           <div className="pt-2 border-t border-neutral-800 flex gap-2">
             <button
               onClick={() => {
-                navigateTo({ page: 'about' });
+                handleAboutClick();
                 setMobileMenuOpen(false);
               }}
-              className="flex-1 text-center py-2 text-sm text-neutral-300 bg-neutral-900 rounded"
+              className="flex-1 text-center py-2 text-sm text-neutral-300 hover:text-white bg-neutral-900 rounded transition-colors"
             >
               About
             </button>
             <button
               onClick={() => {
-                navigateTo({ page: 'contact' });
+                handleContactClick();
                 setMobileMenuOpen(false);
               }}
-              className="flex-1 text-center py-2 text-sm text-neutral-300 bg-neutral-900 rounded"
+              className="flex-1 text-center py-2 text-sm text-neutral-300 hover:text-white bg-neutral-900 rounded transition-colors"
             >
               Contact
             </button>

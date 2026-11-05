@@ -42,14 +42,24 @@ export interface PortfolioItem {
   updatedAt: number;
 }
 
+export interface AboutPillar {
+  id: string;
+  title: string;
+  description: string;
+}
+
 export interface SiteProfile {
   name: string;
   title: string;
   subtitle: string;
   bio: string;
+  bioGolf?: string;
+  bioSwim?: string;
   location: string;
   graduationYear: string;
   gpa: string;
+  portraitImage?: string;
+  swimmingImage?: string;
   email: string;
   phone: string;
   socials: {
@@ -62,4 +72,5 @@ export interface SiteProfile {
     value: string;
     sublabel: string;
   }[];
+  pillars?: AboutPillar[];
 }

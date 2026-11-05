@@ -57,11 +57,15 @@ export const DEFAULT_CATEGORIES: Category[] = [
 export const DEFAULT_PROFILE: SiteProfile = {
   name: 'Jackson Hong',
   title: 'Competitive Scholar-Athlete',
-  subtitle: 'Junior Golfer · All-State Swimmer · STEM Honors Student',
+  subtitle: 'Dedication Across Disciplines: Precision on the Course, Power in the Pool.',
   bio: 'Jackson Hong is a dedicated student-athlete focused on tournament golf and sprint butterfly swimming. Combining rigorous physical discipline with academic excellence in physics and biomechanics, Jackson strives for peak performance on the course, in the water, and in the classroom.',
+  bioGolf: 'As a tournament golfer, Jackson competes across AJGA, Toyota Tour Cup, and SCPGA Junior championships, refining a consistent +1.4 index with a focus on course management, pressure putting, and kinematic swing efficiency.',
+  bioSwim: 'Concurrently, as an All-State varsity swimmer, Jackson anchors the sprint butterfly and medley relays, bringing high-intensity physical conditioning and explosive athletic speed that translates directly into clubhead velocity on the golf course.',
   location: 'Southern California, USA',
-  graduationYear: 'Class of 2026',
+  graduationYear: '2026',
   gpa: '3.96 Unweighted / 4.42 Weighted',
+  portraitImage: PORTRAIT_IMAGE,
+  swimmingImage: SWIMMING_IMAGE,
   email: 'jackson.hong.athletics@gmail.com',
   phone: '+1 (949) 555-0182',
   socials: {
@@ -74,6 +78,28 @@ export const DEFAULT_PROFILE: SiteProfile = {
     { label: '100m Butterfly PR', value: '50.82s', sublabel: 'State Championship Finalist' },
     { label: 'Academic Standing', value: '3.96 GPA', sublabel: 'AP Scholar with Distinction' },
     { label: 'Community Service', value: '140+ Hrs', sublabel: 'Youth First Tee Volunteer' }
+  ],
+  pillars: [
+    {
+      id: 'p1',
+      title: 'Tournament Golf',
+      description: 'Championship experience on top coastal courses, tournament low 68 (-4), 114 mph clubhead speed.'
+    },
+    {
+      id: 'p2',
+      title: 'CIF State Swimming',
+      description: '100m Fly All-American qualifying mark (50.82s), varsity sprint anchor, mental resilience under pressure.'
+    },
+    {
+      id: 'p3',
+      title: 'STEM & Research',
+      description: '3.96 unweighted GPA, AP Scholar with Distinction, computer vision kinematic biomechanics research.'
+    },
+    {
+      id: 'p4',
+      title: 'Youth Mentorship',
+      description: '140+ volunteer hours mentoring junior athletes in golf fundamentals and water safety education.'
+    }
   ]
 };
 

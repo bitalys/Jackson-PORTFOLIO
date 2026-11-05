@@ -1,14 +1,15 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
   X, Lock, Unlock, Plus, Trash2, Edit3, Upload, Film, 
   Image as ImageIcon, Check, RefreshCw, KeyRound, Layers,
-  ListPlus, FileText, ArrowLeft, Star
+  ListPlus, FileText, ArrowLeft, Star, AlertTriangle, Search, Filter, User, Folder, LayoutGrid, List
 } from 'lucide-react';
-import { Category, PortfolioItem, StatHighlight, Submenu, MediaType } from '../types/portfolio';
+import { Category, PortfolioItem, StatHighlight, Submenu, MediaType, SiteProfile } from '../types/portfolio';
 import { 
   PortfolioStorage, 
   readFileAsDataUrl, 
-  extractYouTubeId 
+  extractYouTubeId,
+  DEFAULT_PROFILE
 } from '../services/storage';
 
 interface AdminModalProps {
@@ -34,8 +35,47 @@ export const AdminModal: React.FC<AdminModalProps> = ({
   onDataChanged,
   editingItemInitial
 }) => {
-  // Navigation Tabs inside Admin
-  const [activeTab, setActiveTab] = useState<'items' | 'categories' | 'settings'>('items');
+  // Navigation Tabs inside Admin: items | categories | about | settings
+  const [activeTab, setActiveTab] = useState<'items' | 'categories' | 'about' | 'settings'>('items');
+
+  // Confirmation modal state for destructive delete operations
+  const [deleteConfirm, setDeleteConfirm] = useState<{
+    isOpen: boolean;
+    title: string;
+    description: string;
+    onConfirm: () => void | Promise<void>;
+  }>({
+    isOpen: false,
+    title: '',
+    description: '',
+    onConfirm: () => {}
+  });
+
+  const promptDelete = (title: string, description: string, onConfirm: () => void | Promise<void>) => {
+    setDeleteConfirm({
+      isOpen: true,
+      title,
+      description,
+      onConfirm
+    });
+  };
+
+  // Items Tab Filter & Categorization State
+  const [filterCategoryId, setFilterCategoryId] = useState<string>('all');
+  const [filterSubmenuId, setFilterSubmenuId] = useState<string>('all');
+  const [itemSearchQuery, setItemSearchQuery] = useState<string>('');
+  const [viewModeGrouping, setViewModeGrouping] = useState<'grouped' | 'list'>('grouped');
+
+  // About / Profile CMS State
+  const [aboutProfile, setAboutProfile] = useState<SiteProfile>(() => PortfolioStorage.getProfile());
+  const [aboutFeedback, setAboutFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  // Sync aboutProfile on open or tab change
+  useEffect(() => {
+    if (isOpen) {
+      setAboutProfile(PortfolioStorage.getProfile());
+    }
+  }, [isOpen, activeTab]);
   
   // Password prompt state
   const [passwordInput, setPasswordInput] = useState('');
@@ -301,12 +341,16 @@ export const AdminModal: React.FC<AdminModalProps> = ({
     }
   };
 
-  // Delete Submenu
-  const handleDeleteSubmenu = async (catId: string, subId: string) => {
-    if (confirm('해당 서브메뉴를 삭제하시겠습니까? 연결된 자료는 유지됩니다.')) {
-      await PortfolioStorage.deleteSubmenu(catId, subId);
-      onDataChanged();
-    }
+  // Delete Submenu with confirmation dialog
+  const handleDeleteSubmenu = (catId: string, subId: string, subName?: string) => {
+    promptDelete(
+      '서브메뉴 삭제 확인',
+      `'${subName || '서브메뉴'}'를 삭제하시겠습니까? 해당 서브메뉴에 속한 자료는 카테고리에 안전하게 유지됩니다.`,
+      async () => {
+        await PortfolioStorage.deleteSubmenu(catId, subId);
+        onDataChanged();
+      }
+    );
   };
 
   // Create Top Category
@@ -317,15 +361,79 @@ export const AdminModal: React.FC<AdminModalProps> = ({
       setNewCategoryLabel('');
       onDataChanged();
     } else {
-      alert('이미 존재하는 카테고리이거나 생성이 불가능합니다.');
+      setFormFeedback({ type: 'error', message: '이미 존재하는 카테고리이거나 생성이 불가능합니다.' });
     }
   };
 
-  // Delete Top Category
-  const handleDeleteCategory = async (catId: string) => {
-    if (confirm('해당 카테고리를 삭제하시겠습니까?')) {
-      await PortfolioStorage.deleteCategory(catId);
+  // Delete Top Category with confirmation dialog
+  const handleDeleteCategory = (catId: string, catLabel?: string) => {
+    promptDelete(
+      '카테고리 삭제 확인',
+      `'${catLabel || '카테고리'}'를 삭제하시겠습니까? 포함된 하위 서브메뉴가 함께 삭제됩니다.`,
+      async () => {
+        await PortfolioStorage.deleteCategory(catId);
+        onDataChanged();
+      }
+    );
+  };
+
+  // About CMS Handlers (Home 상단 About 내용 수정)
+  const handlePortraitUpload = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    try {
+      const dataUrl = await readFileAsDataUrl(files[0]);
+      setAboutProfile((prev) => ({ ...prev, portraitImage: dataUrl }));
+      setAboutFeedback({ type: 'success', message: '인물 프로필 사진이 등록되었습니다. 하단 [저장하기]를 눌러 적용하세요.' });
+    } catch {
+      setAboutFeedback({ type: 'error', message: '사진 파일을 읽는 중 오류가 발생했습니다.' });
+    }
+  };
+
+  const handleSwimmingUpload = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    try {
+      const dataUrl = await readFileAsDataUrl(files[0]);
+      setAboutProfile((prev) => ({ ...prev, swimmingImage: dataUrl }));
+      setAboutFeedback({ type: 'success', message: '수영/경기 사진이 등록되었습니다. 하단 [저장하기]를 눌러 적용하세요.' });
+    } catch {
+      setAboutFeedback({ type: 'error', message: '사진 파일을 읽는 중 오류가 발생했습니다.' });
+    }
+  };
+
+  const handleUpdateAboutMetric = (index: number, field: 'label' | 'value' | 'sublabel', val: string) => {
+    setAboutProfile((prev) => {
+      const updated = [...prev.metrics];
+      if (updated[index]) {
+        updated[index] = { ...updated[index], [field]: val };
+      }
+      return { ...prev, metrics: updated };
+    });
+  };
+
+  const handleUpdateAboutPillar = (index: number, field: 'title' | 'description', val: string) => {
+    setAboutProfile((prev) => {
+      const updated = prev.pillars ? [...prev.pillars] : [
+        { id: 'p1', title: 'Tournament Golf', description: '' },
+        { id: 'p2', title: 'CIF State Swimming', description: '' },
+        { id: 'p3', title: 'STEM & Research', description: '' },
+        { id: 'p4', title: 'Youth Mentorship', description: '' }
+      ];
+      if (updated[index]) {
+        updated[index] = { ...updated[index], [field]: val };
+      }
+      return { ...prev, pillars: updated };
+    });
+  };
+
+  const handleSaveAboutProfile = (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      PortfolioStorage.saveProfile(aboutProfile);
       onDataChanged();
+      setAboutFeedback({ type: 'success', message: 'Home 상단 About 소개 내용이 성공적으로 저장되었습니다!' });
+      setTimeout(() => setAboutFeedback(null), 4000);
+    } catch {
+      setAboutFeedback({ type: 'error', message: '저장 중 오류가 발생했습니다.' });
     }
   };
 
@@ -339,13 +447,18 @@ export const AdminModal: React.FC<AdminModalProps> = ({
     setTimeout(() => setPasswordSuccess(''), 3000);
   };
 
-  // Reset to Factory Default Data
-  const handleResetDefaults = async () => {
-    if (confirm('모든 자료와 카테고리를 잭슨 홍(Jackson Hong)의 기본 예시 데이터로 초기화하시겠습니까? (초기 비밀번호는 1111로 복원됩니다)')) {
-      await PortfolioStorage.resetToDefaults();
-      onDataChanged();
-      alert('초기 데이터로 복원되었습니다.');
-    }
+  // Reset to Factory Default Data with confirmation dialog
+  const handleResetDefaults = () => {
+    promptDelete(
+      '전체 데이터 초기화 확인',
+      '모든 포트폴리오 자료와 카테고리를 잭슨 홍(Jackson Hong)의 기본 예시 데이터로 초기화하시겠습니까? 초기 비밀번호는 1111로 복원됩니다.',
+      async () => {
+        await PortfolioStorage.resetToDefaults();
+        onDataChanged();
+        setAboutProfile(PortfolioStorage.getProfile());
+        setFormFeedback({ type: 'success', message: '기본 예시 데이터로 복원되었습니다.' });
+      }
+    );
   };
 
   return (
@@ -454,6 +567,17 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                 >
                   <Layers className="w-4 h-4" />
                   <span>서브 메뉴 & 카테고리 관리</span>
+                </button>
+                <button
+                  onClick={() => setActiveTab('about')}
+                  className={`cursor-pointer flex items-center gap-2 px-4 py-2.5 text-xs font-semibold rounded-t-lg border-b-2 transition-colors ${
+                    activeTab === 'about'
+                      ? 'text-amber-400 border-amber-400 bg-neutral-800/60 font-bold'
+                      : 'text-neutral-400 border-transparent hover:text-white'
+                  }`}
+                >
+                  <User className="w-4 h-4" />
+                  <span>Home About 소개 관리</span>
                 </button>
                 <button
                   onClick={() => setActiveTab('settings')}
@@ -804,16 +928,22 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                                   <button
                                     type="button"
                                     onClick={() => {
-                                      const updated = galleryImages.filter((_, i) => i !== idx);
-                                      setGalleryImages(updated);
-                                      if (isCover && updated.length > 0) {
-                                        setCoverImage(updated[0]);
-                                      } else if (isCover) {
-                                        setCoverImage('');
-                                      }
+                                      promptDelete(
+                                        '업로드 사진 삭제 확인',
+                                        '선택한 사진을 갤러리 목록에서 삭제하시겠습니까?',
+                                        () => {
+                                          const updated = galleryImages.filter((_, i) => i !== idx);
+                                          setGalleryImages(updated);
+                                          if (isCover && updated.length > 0) {
+                                            setCoverImage(updated[0]);
+                                          } else if (isCover) {
+                                            setCoverImage('');
+                                          }
+                                        }
+                                      );
                                     }}
-                                    className="cursor-pointer p-1 rounded bg-red-600 text-white"
-                                    title="삭제"
+                                    className="cursor-pointer p-1 rounded bg-red-600 hover:bg-red-500 text-white transition-colors"
+                                    title="사진 삭제"
                                   >
                                     <Trash2 className="w-3.5 h-3.5" />
                                   </button>
@@ -860,8 +990,15 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                           />
                           <button
                             type="button"
-                            onClick={() => handleRemoveHighlight(h.id)}
-                            className="cursor-pointer p-1.5 text-neutral-500 hover:text-red-400"
+                            onClick={() => {
+                              promptDelete(
+                                '성과 지표 삭제 확인',
+                                `'${h.label || '성과 지표'}' 항목을 삭제하시겠습니까?`,
+                                () => handleRemoveHighlight(h.id)
+                              );
+                            }}
+                            className="cursor-pointer p-1.5 text-neutral-500 hover:text-red-400 rounded transition-colors"
+                            title="지표 삭제"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>

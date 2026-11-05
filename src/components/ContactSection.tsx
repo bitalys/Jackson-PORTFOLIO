@@ -29,7 +29,7 @@ export const ContactSection: React.FC<ContactSectionProps> = ({ profile }) => {
   };
 
   return (
-    <section id="contact-section" className="py-20 border-b border-neutral-800/80 bg-neutral-950">
+    <section id="contact" className="py-20 border-b border-neutral-800/80 bg-neutral-950">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
           {/* Left: Contact Info */}
