@@ -21,7 +21,7 @@ export const ContactSubPage: React.FC<ContactSubPageProps> = ({ profile }) => {
           className="cursor-pointer inline-flex items-center gap-1.5 text-xs font-semibold text-neutral-400 hover:text-white transition-colors"
         >
           <ArrowLeft className="w-3.5 h-3.5" />
-          <span>메인 홈으로 이동 (Back to Home)</span>
+          <span>Back to Home</span>
         </button>
       </div>
 

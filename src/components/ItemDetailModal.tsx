@@ -136,14 +136,14 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
               <button
                 onClick={handlePrev}
                 className="cursor-pointer p-1.5 text-neutral-400 hover:text-white hover:bg-neutral-800 rounded-l transition-colors"
-                title="이전 자료 (Previous, Left Arrow)"
+                title="Previous (Left Arrow)"
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
               <button
                 onClick={handleNext}
                 className="cursor-pointer p-1.5 text-neutral-400 hover:text-white hover:bg-neutral-800 rounded-r transition-colors"
-                title="다음 자료 (Next, Right Arrow)"
+                title="Next (Right Arrow)"
               >
                 <ChevronRight className="w-4 h-4" />
               </button>
@@ -176,7 +176,7 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                   }`}
                 >
                   <Play className="w-3.5 h-3.5 fill-current" />
-                  <span>유튜브 영상 재생</span>
+                  <span>Watch Video</span>
                 </button>
                 <button
                   onClick={() => setActiveMediaTab('gallery')}
@@ -186,7 +186,7 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                       : 'text-neutral-400 hover:text-white bg-neutral-800'
                   }`}
                 >
-                  대회 사진 갤러리 ({allImages.length})
+                  Photo Gallery ({allImages.length})
                 </button>
               </div>
             )}
@@ -205,7 +205,7 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                   />
                 </div>
                 <div className="flex items-center justify-between text-xs text-neutral-400 px-1">
-                  <span>영상이 브라우저 설정으로 인해 재생되지 않는 경우:</span>
+                  <span>Video not playing due to browser settings?</span>
                   <a
                     href={item.youtubeUrl || `https://www.youtube.com/watch?v=${item.youtubeVideoId}`}
                     target="_blank"
@@ -213,7 +213,7 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                     className="text-red-400 hover:text-red-300 font-semibold flex items-center gap-1 hover:underline"
                   >
                     <Play className="w-3 h-3 fill-current" />
-                    <span>YouTube에서 직접 열기</span>
+                    <span>Open on YouTube</span>
                   </a>
                 </div>
               </div>
@@ -312,7 +312,7 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                   rel="noreferrer"
                   className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-200 hover:text-white text-xs font-semibold transition-colors border border-neutral-700"
                 >
-                  <span>{item.externalLinkLabel || '공식 결과 및 웹사이트'}</span>
+                  <span>{item.externalLinkLabel || 'Official Results & Website'}</span>
                   <ExternalLink className="w-3.5 h-3.5" />
                 </a>
               )}
@@ -324,7 +324,7 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                   className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-red-600/20 hover:bg-red-600/30 text-red-300 text-xs font-semibold transition-colors border border-red-500/40"
                 >
                   <Play className="w-3.5 h-3.5 fill-current" />
-                  <span>YouTube에서 열기</span>
+                  <span>Open on YouTube</span>
                 </a>
               )}
             </div>

@@ -405,7 +405,7 @@ function idbDone(tx: IDBTransaction): Promise<void> {
   return new Promise((resolve, reject) => {
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
-    tx.onabort = () => reject(tx.error || new Error('저장이 중단되었습니다. (저장 공간 부족 가능성)'));
+    tx.onabort = () => reject(tx.error || new Error('Saving was aborted (storage may be full).'));
   });
 }
 
@@ -512,7 +512,7 @@ const LocalBackend: StorageBackend = {
     try {
       localStorage.setItem(LOCAL_STORAGE_PROFILE_KEY, JSON.stringify(profile));
     } catch {
-      throw new Error('브라우저 저장 공간이 부족해 저장하지 못했습니다. 사진 용량을 줄여 다시 시도해 주세요.');
+      throw new Error('Not enough browser storage to save. Please use smaller photos and try again.');
     }
   },
 
@@ -628,12 +628,12 @@ const fromRow = (row: ItemRow): PortfolioItem => ({
 });
 
 function cloud() {
-  if (!supabase) throw new Error('Supabase 설정(환경변수)이 없습니다.');
+  if (!supabase) throw new Error('Supabase is not configured (missing environment variables).');
   return supabase;
 }
 
 function check<T extends { error: { message: string } | null }>(res: T, action: string): T {
-  if (res.error) throw new Error(`${action} 실패: ${res.error.message}`);
+  if (res.error) throw new Error(`${action} failed: ${res.error.message}`);
   return res;
 }
 
@@ -667,7 +667,7 @@ const profileImages = (p: SiteProfile) => [p.portraitImage, p.swimmingImage];
 let seededChecked = false;
 async function ensureCloudSeeded() {
   if (seededChecked) return;
-  const { data } = check(await cloud().from('site_profile').select('id').eq('id', 1).maybeSingle(), '초기 데이터 확인');
+  const { data } = check(await cloud().from('site_profile').select('id').eq('id', 1).maybeSingle(), 'Checking initial data');
   if (!data) {
     await CloudBackend.replaceAll(DEFAULT_CATEGORIES, DEFAULT_ITEMS, DEFAULT_PROFILE);
   }
@@ -681,8 +681,8 @@ const CloudBackend: StorageBackend = {
       db.from('categories').select('*').order('sort_order'),
       db.from('submenus').select('*').order('sort_order')
     ]);
-    check(cats, '카테고리 불러오기');
-    check(subs, '서브메뉴 불러오기');
+    check(cats, 'Loading categories');
+    check(subs, 'Loading sub-menus');
     if (!cats.data || cats.data.length === 0) return DEFAULT_CATEGORIES;
     return cats.data.map((c) => ({
       id: c.id,
@@ -706,19 +706,19 @@ const CloudBackend: StorageBackend = {
       c.submenus.map((s, i) => ({ id: s.id, category_id: c.id, name: s.name, sort_order: i }))
     );
 
-    check(await db.from('categories').upsert(catRows), '카테고리 저장');
-    if (subRows.length) check(await db.from('submenus').upsert(subRows), '서브메뉴 저장');
+    check(await db.from('categories').upsert(catRows), 'Saving categories');
+    if (subRows.length) check(await db.from('submenus').upsert(subRows), 'Saving sub-menus');
 
     // 목록에서 빠진 서브메뉴 / 카테고리 삭제
-    const existingSubs = check(await db.from('submenus').select('id'), '서브메뉴 확인').data || [];
+    const existingSubs = check(await db.from('submenus').select('id'), 'Checking sub-menus').data || [];
     const subIds = new Set(subRows.map((s) => s.id));
     const staleSubs = existingSubs.map((s) => s.id).filter((id) => !subIds.has(id));
-    if (staleSubs.length) check(await db.from('submenus').delete().in('id', staleSubs), '서브메뉴 삭제');
+    if (staleSubs.length) check(await db.from('submenus').delete().in('id', staleSubs), 'Deleting sub-menus');
 
-    const existingCats = check(await db.from('categories').select('id'), '카테고리 확인').data || [];
+    const existingCats = check(await db.from('categories').select('id'), 'Checking categories').data || [];
     const catIds = new Set(catRows.map((c) => c.id));
     const staleCats = existingCats.map((c) => c.id).filter((id) => !catIds.has(id));
-    if (staleCats.length) check(await db.from('categories').delete().in('id', staleCats), '카테고리 삭제');
+    if (staleCats.length) check(await db.from('categories').delete().in('id', staleCats), 'Deleting categories');
   },
 
   async getItems() {
@@ -727,7 +727,7 @@ const CloudBackend: StorageBackend = {
       db.from('items').select('*').order('created_at', { ascending: false }),
       db.from('site_profile').select('id').eq('id', 1).maybeSingle()
     ]);
-    check(items, '자료 불러오기');
+    check(items, 'Loading items');
     // 아직 한 번도 저장한 적 없는 빈 클라우드라면 기본 예시를 보여줌
     if ((!items.data || items.data.length === 0) && !profile.data) return DEFAULT_ITEMS;
     return sortItems((items.data as ItemRow[]).map(fromRow).map(normalizeMedia));
@@ -735,30 +735,30 @@ const CloudBackend: StorageBackend = {
 
   async insertItem(item) {
     await ensureCloudSeeded();
-    check(await cloud().from('items').insert(toRow(item)), '자료 등록');
+    check(await cloud().from('items').insert(toRow(item)), 'Creating item');
   },
 
   async updateItem(item, previous) {
     await ensureCloudSeeded();
-    check(await cloud().from('items').upsert(toRow(item)), '자료 수정');
+    check(await cloud().from('items').upsert(toRow(item)), 'Updating item');
     await removeUnusedFiles(itemImages(previous), itemImages(item));
   },
 
   async deleteItem(item) {
     await ensureCloudSeeded();
-    check(await cloud().from('items').delete().eq('id', item.id), '자료 삭제');
+    check(await cloud().from('items').delete().eq('id', item.id), 'Deleting item');
     await removeUnusedFiles(itemImages(item), []);
   },
 
   async getProfile() {
-    const res = check(await cloud().from('site_profile').select('data').eq('id', 1).maybeSingle(), 'About 불러오기');
+    const res = check(await cloud().from('site_profile').select('data').eq('id', 1).maybeSingle(), 'Loading About');
     if (!res.data) return DEFAULT_PROFILE;
     return normalizeProfile({ ...DEFAULT_PROFILE, ...(res.data.data as SiteProfile) });
   },
 
   async saveProfile(profile, previous) {
     await ensureCloudSeeded();
-    check(await cloud().from('site_profile').upsert({ id: 1, data: profile }), 'About 저장');
+    check(await cloud().from('site_profile').upsert({ id: 1, data: profile }), 'Saving About');
     if (previous) await removeUnusedFiles(profileImages(previous), profileImages(profile));
   },
 
@@ -767,7 +767,7 @@ const CloudBackend: StorageBackend = {
     const ext = blob.type === 'image/jpeg' ? 'jpg' : (file.name.split('.').pop() || 'img').toLowerCase();
     const path = `uploads/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
     const bucket = cloud().storage.from(MEDIA_BUCKET);
-    check(await bucket.upload(path, blob, { contentType: blob.type || file.type, cacheControl: '31536000' }), '사진 업로드');
+    check(await bucket.upload(path, blob, { contentType: blob.type || file.type, cacheControl: '31536000' }), 'Uploading photo');
     return bucket.getPublicUrl(path).data.publicUrl;
   },
 
@@ -776,13 +776,13 @@ const CloudBackend: StorageBackend = {
     await this.saveCategories(categories);
 
     const rows = items.map(toRow);
-    if (rows.length) check(await db.from('items').upsert(rows), '자료 저장');
-    const existing = check(await db.from('items').select('id'), '자료 확인').data || [];
+    if (rows.length) check(await db.from('items').upsert(rows), 'Saving items');
+    const existing = check(await db.from('items').select('id'), 'Checking items').data || [];
     const ids = new Set(rows.map((r) => r.id));
     const stale = existing.map((r) => r.id).filter((id) => !ids.has(id));
-    if (stale.length) check(await db.from('items').delete().in('id', stale), '자료 삭제');
+    if (stale.length) check(await db.from('items').delete().in('id', stale), 'Deleting item');
 
-    check(await db.from('site_profile').upsert({ id: 1, data: profile }), 'About 저장');
+    check(await db.from('site_profile').upsert({ id: 1, data: profile }), 'Saving About');
     seededChecked = true;
   }
 };
@@ -923,14 +923,14 @@ export const PortfolioStorage = {
    * 사진(data URL)은 Storage에 업로드한 뒤 URL로 바꿔 저장합니다.
    */
   async migrateLocalToCloud(onProgress?: (message: string) => void): Promise<{ items: number; images: number }> {
-    if (!isCloudEnabled) throw new Error('Supabase 설정이 없어 이전할 수 없습니다.');
+    if (!isCloudEnabled) throw new Error('Supabase is not configured, so migration is not possible.');
     const { categories, items, profile } = await readLocalData();
     const cache = new Map<string, string>();
 
     const migratedItems: PortfolioItem[] = [];
     for (let i = 0; i < items.length; i++) {
       const item = items[i];
-      onProgress?.(`자료 사진 업로드 중... (${i + 1}/${items.length}) ${item.title}`);
+      onProgress?.(`Uploading item photos... (${i + 1}/${items.length}) ${item.title}`);
       const cover = (await uploadIfDataUrl(item.coverImage, cache)) || '';
       const gallery: string[] = [];
       for (const img of item.galleryImages || []) {
@@ -940,14 +940,14 @@ export const PortfolioStorage = {
       migratedItems.push({ ...item, coverImage: cover, galleryImages: gallery });
     }
 
-    onProgress?.('About 사진 업로드 중...');
+    onProgress?.('Uploading About photos...');
     const migratedProfile: SiteProfile = {
       ...profile,
       portraitImage: await uploadIfDataUrl(profile.portraitImage, cache),
       swimmingImage: await uploadIfDataUrl(profile.swimmingImage, cache)
     };
 
-    onProgress?.('Supabase에 저장 중...');
+    onProgress?.('Saving to Supabase...');
     await CloudBackend.replaceAll(categories, migratedItems, migratedProfile);
     return { items: migratedItems.length, images: cache.size };
   }

@@ -128,7 +128,7 @@ export const Header: React.FC<HeaderProps> = ({
                         }}
                         className="cursor-pointer w-full text-left px-3 py-2 text-xs font-semibold rounded-lg text-amber-400 hover:bg-neutral-800 transition-colors flex items-center justify-between"
                       >
-                        <span>전체 {cat.label} 서브페이지</span>
+                        <span>All {cat.label}</span>
                         <span className="text-[10px] text-neutral-500">→</span>
                       </button>
 
@@ -190,17 +190,17 @@ export const Header: React.FC<HeaderProps> = ({
                 ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 hover:bg-amber-500/30'
                 : 'bg-neutral-800 text-neutral-200 border border-neutral-700 hover:bg-neutral-700 hover:text-white'
             }`}
-            title="관리자 페이지 (Admin CMS)"
+            title="Admin Page"
           >
             {isAdmin ? (
               <>
                 <Unlock className="w-3.5 h-3.5 text-amber-400" />
-                <span>관리자 모드</span>
+                <span>Admin Mode</span>
               </>
             ) : (
               <>
                 <Lock className="w-3.5 h-3.5" />
-                <span>관리자 로그인</span>
+                <span>Admin Login</span>
               </>
             )}
           </button>
@@ -242,7 +242,7 @@ export const Header: React.FC<HeaderProps> = ({
                   isCategoryActive(cat.id) ? 'bg-neutral-800 text-amber-400' : 'text-white'
                 }`}
               >
-                {cat.label} (서브 페이지)
+                {cat.label}
               </button>
 
               <div className="pl-4 space-y-1 border-l border-neutral-800">

@@ -52,16 +52,16 @@ export const ItemThirdPage: React.FC<ItemThirdPageProps> = ({
     return (
       <div className="max-w-4xl mx-auto px-4 py-24 text-center space-y-4">
         <h2 className="text-2xl font-bold text-white font-['Outfit']">
-          자료를 찾을 수 없습니다
+          Item not found
         </h2>
         <p className="text-sm text-neutral-400">
-          요청하신 서드 페이지 자료가 삭제되었거나 존재하지 않습니다.
+          The item you requested has been removed or does not exist.
         </p>
         <button
           onClick={() => navigateTo({ page: 'home' })}
           className="cursor-pointer px-5 py-2.5 bg-amber-500 text-neutral-950 font-bold text-xs rounded-lg hover:bg-amber-400"
         >
-          메인 홈으로 이동
+          Back to Home
         </button>
       </div>
     );
@@ -125,13 +125,13 @@ export const ItemThirdPage: React.FC<ItemThirdPageProps> = ({
             className="cursor-pointer inline-flex items-center gap-1.5 text-xs font-semibold text-neutral-400 hover:text-white transition-colors"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
-            <span>{submenuLabel} 서브 페이지로 돌아가기</span>
+            <span>Back to {submenuLabel}</span>
           </button>
 
           <button
             onClick={handleShare}
             className="cursor-pointer p-2 rounded-lg bg-neutral-900 border border-neutral-800 text-neutral-400 hover:text-white transition-colors"
-            title="서드 페이지 링크 복사"
+            title="Copy link"
           >
             {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Share2 className="w-4 h-4" />}
           </button>
@@ -210,7 +210,7 @@ export const ItemThirdPage: React.FC<ItemThirdPageProps> = ({
               }`}
             >
               <Play className="w-3.5 h-3.5 fill-current" />
-              <span>유튜브 공식 영상</span>
+              <span>Official Video</span>
             </button>
             <button
               onClick={() => setActiveMediaTab('gallery')}
@@ -220,7 +220,7 @@ export const ItemThirdPage: React.FC<ItemThirdPageProps> = ({
                   : 'text-neutral-400 hover:text-white bg-neutral-900'
               }`}
             >
-              대회 사진 갤러리 ({allImages.length})
+              Photo Gallery ({allImages.length})
             </button>
           </div>
         )}
@@ -239,7 +239,7 @@ export const ItemThirdPage: React.FC<ItemThirdPageProps> = ({
               />
             </div>
             <div className="flex items-center justify-between text-xs text-neutral-400 px-1">
-              <span>영상이 브라우저 보안 또는 서드파티 제한으로 재생되지 않을 경우:</span>
+              <span>Video not playing due to browser or third-party restrictions?</span>
               <a
                 href={item.youtubeUrl || `https://www.youtube.com/watch?v=${item.youtubeVideoId}`}
                 target="_blank"
@@ -247,7 +247,7 @@ export const ItemThirdPage: React.FC<ItemThirdPageProps> = ({
                 className="text-red-400 hover:text-red-300 font-semibold flex items-center gap-1 hover:underline"
               >
                 <Play className="w-3.5 h-3.5 fill-current" />
-                <span>YouTube에서 직접 보기</span>
+                <span>Watch on YouTube</span>
               </a>
             </div>
           </div>
@@ -271,7 +271,7 @@ export const ItemThirdPage: React.FC<ItemThirdPageProps> = ({
                 }}
               />
               <div className="absolute bottom-4 right-4 px-3 py-1.5 rounded-lg bg-neutral-950/80 border border-neutral-700 text-xs text-neutral-200">
-                클릭하여 팝업으로 크게 보기
+                Click to enlarge
               </div>
             </div>
 
@@ -317,7 +317,7 @@ export const ItemThirdPage: React.FC<ItemThirdPageProps> = ({
                 rel="noreferrer"
                 className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-neutral-950 font-bold text-xs transition-colors"
               >
-                <span>{item.externalLinkLabel || '공식 리더보드 및 인증 웹사이트'}</span>
+                <span>{item.externalLinkLabel || 'Official Leaderboard & Website'}</span>
                 <ExternalLink className="w-4 h-4" />
               </a>
             )}
@@ -330,7 +330,7 @@ export const ItemThirdPage: React.FC<ItemThirdPageProps> = ({
                 className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 text-neutral-200 hover:text-white font-semibold text-xs transition-colors"
               >
                 <Play className="w-4 h-4 text-red-500 fill-current" />
-                <span>YouTube에서 원본 영상 보기</span>
+                <span>Watch Original on YouTube</span>
               </a>
             )}
           </div>
@@ -339,25 +339,25 @@ export const ItemThirdPage: React.FC<ItemThirdPageProps> = ({
         {/* Sidebar Info Card */}
         <div className="lg:col-span-4 p-6 rounded-2xl border border-neutral-800 bg-neutral-900/40 space-y-4">
           <h4 className="text-xs font-bold uppercase tracking-wider text-neutral-400">
-            자료 정보 (Item Metadata)
+            Details
           </h4>
 
           <div className="space-y-3 text-xs divide-y divide-neutral-800">
             <div className="pt-2 flex justify-between">
-              <span className="text-neutral-400">대분류 (Category)</span>
+              <span className="text-neutral-400">Category</span>
               <span className="font-semibold text-white">{categoryLabel}</span>
             </div>
             <div className="pt-2 flex justify-between">
-              <span className="text-neutral-400">서브메뉴 (Sub-menu)</span>
+              <span className="text-neutral-400">Section</span>
               <span className="font-semibold text-amber-400">{submenuLabel}</span>
             </div>
             <div className="pt-2 flex justify-between">
-              <span className="text-neutral-400">기록 일자 (Date)</span>
+              <span className="text-neutral-400">Date</span>
               <span className="font-mono text-white">{item.date}</span>
             </div>
             <div className="pt-2 flex justify-between">
-              <span className="text-neutral-400">미디어 형태</span>
-              <span className="text-neutral-200 capitalize">{item.mediaType}</span>
+              <span className="text-neutral-400">Media</span>
+              <span className="text-neutral-200">{item.mediaType === 'both' ? 'Video & Photos' : item.mediaType === 'youtube' ? 'Video' : 'Photos'}</span>
             </div>
           </div>
         </div>
@@ -368,7 +368,7 @@ export const ItemThirdPage: React.FC<ItemThirdPageProps> = ({
         <section className="pt-10 border-t border-neutral-800 space-y-6">
           <div className="flex items-center justify-between">
             <h3 className="font-['Outfit'] text-2xl font-bold text-white">
-              {categoryLabel}의 다른 자료 더보기
+              More from {categoryLabel}
             </h3>
             <button
               onClick={() =>
@@ -379,7 +379,7 @@ export const ItemThirdPage: React.FC<ItemThirdPageProps> = ({
               }
               className="cursor-pointer text-xs font-semibold text-amber-400 hover:underline flex items-center gap-1"
             >
-              <span>서브 페이지 목록으로 이동</span>
+              <span>View All in Section</span>
               <ChevronRight className="w-4 h-4" />
             </button>
           </div>

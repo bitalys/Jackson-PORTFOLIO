@@ -60,7 +60,7 @@ export default function App() {
       setLoadError(null);
     } catch (err) {
       console.error(err);
-      setLoadError(err instanceof Error ? err.message : '자료를 불러오지 못했습니다.');
+      setLoadError(err instanceof Error ? err.message : 'Failed to load content.');
     } finally {
       setLoading(false);
     }
@@ -129,11 +129,11 @@ export default function App() {
       <main className="flex-1">
         {loading ? (
           <div className="py-32 text-center text-neutral-500 text-sm">
-            포트폴리오 페이지를 불러오는 중입니다...
+            Loading portfolio...
           </div>
         ) : loadError ? (
           <div className="py-32 px-4 text-center space-y-4">
-            <p className="text-neutral-300 text-sm">자료를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.</p>
+            <p className="text-neutral-300 text-sm">We couldn't load the portfolio. Please try again in a moment.</p>
             <p className="text-neutral-500 text-xs break-words">{loadError}</p>
             <button
               onClick={() => {
@@ -142,7 +142,7 @@ export default function App() {
               }}
               className="cursor-pointer px-4 py-2 text-xs font-semibold rounded-md bg-neutral-800 text-neutral-200 hover:bg-neutral-700"
             >
-              다시 시도
+              Try Again
             </button>
           </div>
         ) : currentRoute.page === 'home' ? (

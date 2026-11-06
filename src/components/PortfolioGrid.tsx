@@ -55,10 +55,10 @@ export const PortfolioGrid: React.FC<PortfolioGridProps> = ({
           <ImageIcon className="w-6 h-6" />
         </div>
         <h3 className="text-lg font-bold text-white mb-2 font-['Outfit']">
-          등록된 자료가 없습니다
+          No items yet
         </h3>
         <p className="text-sm text-neutral-400 max-w-md mx-auto mb-6">
-          선택한 카테고리 또는 검색 조건에 부합하는 자료가 없거나 아직 등록되지 않았습니다.
+          Nothing matches the selected category or search yet. Please check back soon.
         </p>
         {isAdmin && onAddNewItem && (
           <button
@@ -335,7 +335,7 @@ export const PortfolioGrid: React.FC<PortfolioGridProps> = ({
 
               {item.externalLink && (
                 <div className="mt-3 pt-2 text-[11px] text-amber-400/90 flex items-center gap-1 hover:underline">
-                  <span>{item.externalLinkLabel || '자료 링크 열기'}</span>
+                  <span>{item.externalLinkLabel || 'Open Link'}</span>
                   <ExternalLink className="w-3 h-3" />
                 </div>
               )}

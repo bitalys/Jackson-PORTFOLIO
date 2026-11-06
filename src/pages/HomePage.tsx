@@ -47,7 +47,7 @@ export const HomePage: React.FC<HomePageProps> = ({
         onExploreClick={handleScrollToFeatured}
       />
 
-      {/* 2. Middle Section: 주요 추천 자료 및 경기 하이라이트 (Featured Highlights Showcase) */}
+      {/* 2. Middle Section: Featured Highlights (Featured Highlights Showcase) */}
       <section id="featured" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8 scroll-mt-24">
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 pb-4 border-b border-neutral-800/80">
           <div>
@@ -56,10 +56,10 @@ export const HomePage: React.FC<HomePageProps> = ({
               <span>Featured Works & Competition Records</span>
             </div>
             <h2 className="font-['Outfit'] text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-              주요 추천 자료 및 경기 하이라이트
+              Featured Highlights
             </h2>
             <p className="text-xs sm:text-sm text-neutral-400 mt-1">
-              토너먼트 대회 경기 영상 및 공식 기록 자료입니다. 카드를 클릭하여 전용 서드 페이지 또는 팝업으로 상세히 확인할 수 있습니다.
+              Tournament footage and official results. Open a card to view the full details or a quick preview.
             </p>
           </div>
 
@@ -79,7 +79,7 @@ export const HomePage: React.FC<HomePageProps> = ({
               onClick={() => navigateTo({ page: 'category', categoryId: categories[0]?.id || 'athletics' })}
               className="cursor-pointer text-xs font-semibold text-neutral-300 hover:text-white flex items-center gap-1 transition-colors px-3 py-1.5 rounded-lg bg-neutral-900 border border-neutral-800"
             >
-              <span>전체 서브페이지 보기</span>
+              <span>View All</span>
               <ChevronRight className="w-4 h-4" />
             </button>
           </div>
@@ -160,16 +160,16 @@ export const HomePage: React.FC<HomePageProps> = ({
                       onClick={() => navigateTo({ page: 'item', itemId: item.id })}
                       className="cursor-pointer flex-1 py-2 px-3 rounded-lg bg-amber-500 hover:bg-amber-400 text-neutral-950 text-xs font-bold transition-colors text-center"
                     >
-                      서드 페이지로 보기 (상세)
+                      View Details
                     </button>
                     <button
                       type="button"
                       onClick={() => onOpenModal(item)}
                       className="cursor-pointer p-2 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-200 text-xs transition-colors flex items-center gap-1"
-                      title="팝업으로 빠르게 보기 (Quick Popup)"
+                      title="Quick Preview"
                     >
                       <Eye className="w-3.5 h-3.5" />
-                      <span>팝업</span>
+                      <span>Preview</span>
                     </button>
                   </div>
                 </div>

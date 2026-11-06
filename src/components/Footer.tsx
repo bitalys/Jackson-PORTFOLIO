@@ -104,7 +104,7 @@ export const Footer: React.FC<FooterProps> = ({
               className="cursor-pointer text-amber-400 hover:text-amber-300 flex items-center gap-1 font-semibold"
             >
               {isAdmin ? <Unlock className="w-3 h-3" /> : <Lock className="w-3 h-3" />}
-              <span>{isAdmin ? '관리자 모드 활성화됨' : '관리자 로그인 (CMS)'}</span>
+              <span>{isAdmin ? 'Admin Mode Active' : 'Admin Login'}</span>
             </button>
           </div>
 
@@ -112,7 +112,7 @@ export const Footer: React.FC<FooterProps> = ({
           <button
             onClick={scrollToTop}
             className="cursor-pointer p-2.5 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-neutral-300 hover:text-white border border-neutral-800 transition-colors"
-            title="맨 위로 이동 (Back to Top)"
+            title="Back to Top"
             aria-label="Back to Top"
           >
             <ArrowUp className="w-4 h-4" />

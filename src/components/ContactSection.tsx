@@ -97,10 +97,10 @@ export const ContactSection: React.FC<ContactSectionProps> = ({ profile }) => {
                 <div className="p-6 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-center space-y-2">
                   <CheckCircle2 className="w-10 h-10 text-emerald-400 mx-auto" />
                   <h4 className="font-bold text-white text-base font-['Outfit']">
-                    메시지가 전송되었습니다!
+                    Message sent!
                   </h4>
                   <p className="text-xs text-emerald-300">
-                    문의해주셔서 감사합니다. 빠른 시일 내에 연락드리겠습니다.
+                    Thank you for reaching out. I'll get back to you soon.
                   </p>
                 </div>
               ) : (
@@ -108,20 +108,20 @@ export const ContactSection: React.FC<ContactSectionProps> = ({ profile }) => {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-1.5">
                       <label className="text-xs font-semibold text-neutral-300">
-                        성함 / 성명 (Name) <span className="text-amber-400">*</span>
+                        Name <span className="text-amber-400">*</span>
                       </label>
                       <input
                         type="text"
                         value={name}
                         onChange={(e) => setName(e.target.value)}
-                        placeholder="예: Coach Roberts / John Smith"
+                        placeholder="e.g. Coach Roberts / John Smith"
                         className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-amber-400"
                         required
                       />
                     </div>
                     <div className="space-y-1.5">
                       <label className="text-xs font-semibold text-neutral-300">
-                        이메일 (Email) <span className="text-amber-400">*</span>
+                        Email <span className="text-amber-400">*</span>
                       </label>
                       <input
                         type="email"
@@ -136,26 +136,26 @@ export const ContactSection: React.FC<ContactSectionProps> = ({ profile }) => {
 
                   <div className="space-y-1.5">
                     <label className="text-xs font-semibold text-neutral-300">
-                      소속 기관 / 학교 / 단체 (Organization / University / Club)
+                      Organization / University / Club
                     </label>
                     <input
                       type="text"
                       value={organization}
                       onChange={(e) => setOrganization(e.target.value)}
-                      placeholder="예: NCAA Athletic Dept / Junior Golf Tour"
+                      placeholder="e.g. NCAA Athletic Dept / Junior Golf Tour"
                       className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-amber-400"
                     />
                   </div>
 
                   <div className="space-y-1.5">
                     <label className="text-xs font-semibold text-neutral-300">
-                      문의 내용 (Message) <span className="text-amber-400">*</span>
+                      Message <span className="text-amber-400">*</span>
                     </label>
                     <textarea
                       rows={4}
                       value={message}
                       onChange={(e) => setMessage(e.target.value)}
-                      placeholder="대회 일정, 스윙 데이터 요청, 인터뷰 등 문의 내용을 남겨주세요."
+                      placeholder="Tournament schedules, swing data requests, interviews, or any other inquiries."
                       className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-amber-400 leading-relaxed"
                       required
                     />
@@ -166,7 +166,7 @@ export const ContactSection: React.FC<ContactSectionProps> = ({ profile }) => {
                     className="cursor-pointer inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-amber-500 hover:bg-amber-400 text-neutral-950 font-bold text-xs transition-colors shadow-lg shadow-amber-500/10"
                   >
                     <Send className="w-3.5 h-3.5" />
-                    <span>메시지 전송하기</span>
+                    <span>Send Message</span>
                   </button>
                 </form>
               )}

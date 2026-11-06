@@ -86,7 +86,7 @@ export const CategorySubPage: React.FC<CategorySubPageProps> = ({
           className="cursor-pointer inline-flex items-center gap-1.5 text-xs font-semibold text-neutral-400 hover:text-white transition-colors self-start sm:self-auto"
         >
           <ArrowLeft className="w-3.5 h-3.5" />
-          <span>메인 홈으로 이동 (Back to Home)</span>
+          <span>Back to Home</span>
         </button>
       </div>
 
@@ -96,7 +96,7 @@ export const CategorySubPage: React.FC<CategorySubPageProps> = ({
 
         <div className="relative z-10 space-y-4 max-w-3xl">
           <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-amber-400">
-            <span>서브 페이지 (Sub-Page)</span>
+            <span>Category</span>
             <span aria-hidden="true" className="text-neutral-600">·</span>
             <span>{currentCategory?.label}</span>
             {currentSubmenu && (
@@ -113,12 +113,12 @@ export const CategorySubPage: React.FC<CategorySubPageProps> = ({
 
           <p className="text-sm sm:text-base text-neutral-300 leading-relaxed">
             {currentCategory?.description ||
-              `${currentCategory?.label}에 등록된 대회 경기 영상, 성과 기록, 리서치 및 활동 자료입니다.`}
+              `Competition videos, results, research and activities in ${currentCategory?.label}.`}
           </p>
 
           <div className="flex items-center gap-6 pt-2 text-xs text-neutral-400 font-mono">
-            <span>총 자료: <strong className="text-white tabular-nums">{categoryItems.length}</strong>개</span>
-            <span>서브메뉴: <strong className="text-white tabular-nums">{currentCategory?.submenus.length}</strong>개</span>
+            <span>Items: <strong className="text-white tabular-nums">{categoryItems.length}</strong></span>
+            <span>Sections: <strong className="text-white tabular-nums">{currentCategory?.submenus.length}</strong></span>
           </div>
         </div>
       </div>
@@ -137,7 +137,7 @@ export const CategorySubPage: React.FC<CategorySubPageProps> = ({
                   : 'text-neutral-400 hover:text-neutral-200'
               }`}
             >
-              전체 {currentCategory.label}
+              All {currentCategory.label}
             </button>
 
             {/* Individual Sub-menus */}
@@ -184,7 +184,7 @@ export const CategorySubPage: React.FC<CategorySubPageProps> = ({
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="제목, 대회명 검색..."
+                placeholder="Search by title or event..."
                 className="w-full bg-neutral-900 border border-neutral-800 rounded-lg pl-9 pr-3 py-2 text-xs text-neutral-200 placeholder-neutral-500 focus:outline-none focus:border-amber-500"
               />
             </div>
@@ -217,9 +217,9 @@ export const CategorySubPage: React.FC<CategorySubPageProps> = ({
       {categoryItems.length === 0 ? (
         <div className="py-20 text-center rounded-2xl border border-dashed border-neutral-800 bg-neutral-900/40 p-8 space-y-4">
           <FileText className="w-10 h-10 mx-auto text-neutral-600" />
-          <h3 className="text-lg font-bold text-white">등록된 자료가 없습니다</h3>
+          <h3 className="text-lg font-bold text-white">No items yet</h3>
           <p className="text-xs text-neutral-400 max-w-sm mx-auto">
-            현재 서브 메뉴에 등록된 자료가 없습니다. 관리자 모드에서 새 자료를 추가해보세요.
+            There are no items in this section yet. Please check back soon.
           </p>
           {isAdmin && (
             <button
@@ -299,12 +299,12 @@ export const CategorySubPage: React.FC<CategorySubPageProps> = ({
                     onClick={() => navigateTo({ page: 'item', itemId: item.id })}
                     className="cursor-pointer px-3 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-neutral-950 text-xs font-bold transition-colors"
                   >
-                    서드 페이지 (상세)
+                    View Details
                   </button>
                   <button
                     onClick={() => onOpenModal(item)}
                     className="cursor-pointer p-2 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-200 text-xs transition-colors"
-                    title="팝업 미리보기"
+                    title="Quick Preview"
                   >
                     <Eye className="w-4 h-4" />
                   </button>
@@ -425,15 +425,15 @@ export const CategorySubPage: React.FC<CategorySubPageProps> = ({
                       onClick={() => navigateTo({ page: 'item', itemId: item.id })}
                       className="cursor-pointer flex-1 py-2 px-3 rounded-lg bg-amber-500 hover:bg-amber-400 text-neutral-950 text-xs font-bold transition-colors text-center"
                     >
-                      서드 페이지로 보기 (상세)
+                      View Details
                     </button>
                     <button
                       onClick={() => onOpenModal(item)}
                       className="cursor-pointer p-2 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-200 text-xs transition-colors flex items-center gap-1"
-                      title="팝업으로 빠르게 보기"
+                      title="Quick Preview"
                     >
                       <Eye className="w-3.5 h-3.5" />
-                      <span>팝업</span>
+                      <span>Preview</span>
                     </button>
 
                     {isAdmin && (

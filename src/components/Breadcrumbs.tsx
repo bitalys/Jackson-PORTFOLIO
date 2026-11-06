@@ -18,7 +18,7 @@ export const Breadcrumbs: React.FC<BreadcrumbsProps> = ({ items }) => {
       <button
         onClick={() => navigateTo({ page: 'home' })}
         className="cursor-pointer flex items-center gap-1 text-neutral-400 hover:text-white transition-colors shrink-0"
-        title="홈 (Home)"
+        title="Home"
       >
         <Home className="w-3.5 h-3.5" />
         <span>Home</span>
