@@ -22,6 +22,11 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   onCancel
 }) => {
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isOpen) setError(null);
+  }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -36,11 +41,14 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
 
   const handleConfirm = async () => {
     setBusy(true);
+    setError(null);
     try {
       await onConfirm();
+      onCancel();
+    } catch (err) {
+      setError(err instanceof Error && err.message ? err.message : '작업 중 오류가 발생했습니다.');
     } finally {
       setBusy(false);
-      onCancel();
     }
   };
 
@@ -72,6 +80,11 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
               {description}
             </p>
             <p className="text-[11px] text-red-400/90 font-medium">이 작업은 되돌릴 수 없습니다.</p>
+            {error && (
+              <p className="text-[11px] text-red-300 bg-red-500/10 border border-red-500/30 rounded-md px-2 py-1.5 break-words">
+                {error}
+              </p>
+            )}
           </div>
         </div>
 
@@ -92,7 +105,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
             className="cursor-pointer flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-500 rounded-lg transition-colors disabled:opacity-50"
           >
             <Trash2 className="w-3.5 h-3.5" />
-            <span>{busy ? '삭제 중...' : confirmLabel}</span>
+            <span>{busy ? '처리 중...' : confirmLabel}</span>
           </button>
         </div>
       </div>

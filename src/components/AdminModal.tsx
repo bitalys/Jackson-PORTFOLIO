@@ -6,14 +6,17 @@ import {
 } from 'lucide-react';
 import { Category, PortfolioItem, StatHighlight, Submenu, MediaType, SiteProfile } from '../types/portfolio';
 import { 
-  PortfolioStorage, 
-  readFileAsDataUrl, 
+  PortfolioStorage,
   extractYouTubeId,
   DEFAULT_PROFILE,
   PORTRAIT_IMAGE,
   SWIMMING_IMAGE
 } from '../services/storage';
+import { supabase } from '../lib/supabase';
 import { ConfirmDialog } from './ConfirmDialog';
+
+const errorMessage = (err: unknown, fallback: string) =>
+  err instanceof Error && err.message ? err.message : fallback;
 
 interface AdminModalProps {
   isOpen: boolean;
@@ -23,7 +26,7 @@ interface AdminModalProps {
   onLogout: () => void;
   categories: Category[];
   items: PortfolioItem[];
-  onDataChanged: () => void;
+  onDataChanged: () => void | Promise<void>;
   editingItemInitial?: PortfolioItem | null;
 }
 
@@ -47,6 +50,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
     title: string;
     description: string;
     onConfirm: () => void | Promise<void>;
+    confirmLabel?: string;
   }>({
     isOpen: false,
     title: '',
@@ -54,12 +58,18 @@ export const AdminModal: React.FC<AdminModalProps> = ({
     onConfirm: () => {}
   });
 
-  const promptDelete = (title: string, description: string, onConfirm: () => void | Promise<void>) => {
+  const promptDelete = (
+    title: string,
+    description: string,
+    onConfirm: () => void | Promise<void>,
+    confirmLabel?: string
+  ) => {
     setDeleteConfirm({
       isOpen: true,
       title,
       description,
-      onConfirm
+      onConfirm,
+      confirmLabel
     });
   };
 
@@ -75,18 +85,32 @@ export const AdminModal: React.FC<AdminModalProps> = ({
   const [viewModeGrouping, setViewModeGrouping] = useState<'grouped' | 'list'>('grouped');
 
   // About / Profile CMS State
-  const [aboutProfile, setAboutProfile] = useState<SiteProfile>(() => PortfolioStorage.getProfile());
+  const [aboutProfile, setAboutProfile] = useState<SiteProfile>(DEFAULT_PROFILE);
+  const [savedProfile, setSavedProfile] = useState<SiteProfile>(DEFAULT_PROFILE);
+  const [aboutSaving, setAboutSaving] = useState(false);
+
+  const reloadAboutProfile = React.useCallback(async () => {
+    try {
+      const p = await PortfolioStorage.getProfile();
+      setAboutProfile(p);
+      setSavedProfile(p);
+    } catch (err) {
+      setAboutFeedback({ type: 'error', message: errorMessage(err, 'About 내용을 불러오지 못했습니다.') });
+    }
+  }, []);
   const [aboutFeedback, setAboutFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   // Sync aboutProfile on open or tab change
   useEffect(() => {
     if (isOpen) {
-      setAboutProfile(PortfolioStorage.getProfile());
+      reloadAboutProfile();
     }
-  }, [isOpen, activeTab]);
+  }, [isOpen, activeTab, reloadAboutProfile]);
   
   // Password prompt state
+  const [emailInput, setEmailInput] = useState('');
   const [passwordInput, setPasswordInput] = useState('');
+  const [loggingIn, setLoggingIn] = useState(false);
   const [passwordError, setPasswordError] = useState('');
 
   // Password change state
@@ -130,6 +154,12 @@ export const AdminModal: React.FC<AdminModalProps> = ({
 
   // Status messages
   const [formFeedback, setFormFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [uploadingCount, setUploadingCount] = useState(0);
+  const [savingItem, setSavingItem] = useState(false);
+
+  // Cloud migration state
+  const [migrating, setMigrating] = useState(false);
+  const [migrationMessage, setMigrationMessage] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null);
 
   // Synchronize when opening or setting edit item
   React.useEffect(() => {
@@ -140,9 +170,27 @@ export const AdminModal: React.FC<AdminModalProps> = ({
 
   if (!isOpen) return null;
 
-  // Handle Login with password (initial password '1111')
-  const handleLogin = (e: React.FormEvent) => {
+  // Handle Login
+  // - 클라우드 모드: Supabase 이메일/비밀번호 로그인
+  // - 브라우저 모드: 기존 비밀번호 (초기 1111)
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (supabase) {
+      setLoggingIn(true);
+      const { error } = await supabase.auth.signInWithPassword({
+        email: emailInput.trim(),
+        password: passwordInput
+      });
+      setLoggingIn(false);
+      if (error) {
+        setPasswordError('이메일 또는 비밀번호가 올바르지 않습니다.');
+        return;
+      }
+      setPasswordError('');
+      setPasswordInput('');
+      onLoginSuccess();
+      return;
+    }
     if (PortfolioStorage.verifyPassword(passwordInput)) {
       setPasswordError('');
       setPasswordInput('');
@@ -216,13 +264,15 @@ export const AdminModal: React.FC<AdminModalProps> = ({
   // Handle Computer Folder File Uploads (Gallery & Cover)
   const handleGalleryFilesUpload = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
+    const fileArr = Array.from(files);
+    setUploadingCount((n) => n + fileArr.length);
     try {
       const urls: string[] = [];
-      for (let i = 0; i < files.length; i++) {
-        const dataUrl = await readFileAsDataUrl(files[i]);
-        urls.push(dataUrl);
+      for (const file of fileArr) {
+        urls.push(await PortfolioStorage.uploadImage(file));
+        setUploadingCount((n) => n - 1);
       }
-      
+
       setGalleryImages((prev) => {
         const combined = Array.from(new Set([...prev, ...urls]));
         // When one or more photos are registered, default the very first photo as the cover photo!
@@ -237,8 +287,10 @@ export const AdminModal: React.FC<AdminModalProps> = ({
         });
         return combined;
       });
-    } catch {
-      alert('갤러리 이미지를 읽는 중 오류가 발생했습니다.');
+    } catch (err) {
+      setFormFeedback({ type: 'error', message: errorMessage(err, '사진 업로드 중 오류가 발생했습니다.') });
+    } finally {
+      setUploadingCount(0);
     }
   };
 
@@ -272,6 +324,11 @@ export const AdminModal: React.FC<AdminModalProps> = ({
       return;
     }
 
+    if (uploadingCount > 0) {
+      setFormFeedback({ type: 'error', message: '사진 업로드가 끝난 뒤 저장해 주세요.' });
+      return;
+    }
+
     const cleanedHighlights = highlights.filter((h) => h.label.trim() && h.value.trim());
 
     // When one or more photos exist, default the first photo as the cover if not set
@@ -279,6 +336,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
     // Gallery images should not duplicate the cover image
     const finalGallery = galleryImages.filter((img) => img !== finalCover);
 
+    setSavingItem(true);
     try {
       if (editItemId) {
         await PortfolioStorage.updateItem(editItemId, {
@@ -322,13 +380,15 @@ export const AdminModal: React.FC<AdminModalProps> = ({
         setFormFeedback({ type: 'success', message: '새 자료가 성공적으로 등록되었습니다.' });
       }
 
-      onDataChanged();
+      await onDataChanged();
       setTimeout(() => {
         setIsEditing(false);
         setFormFeedback(null);
       }, 700);
-    } catch {
-      setFormFeedback({ type: 'error', message: '저장 중 오류가 발생했습니다.' });
+    } catch (err) {
+      setFormFeedback({ type: 'error', message: errorMessage(err, '저장 중 오류가 발생했습니다.') });
+    } finally {
+      setSavingItem(false);
     }
   };
 
@@ -339,7 +399,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
       `'${item.title}' 자료를 삭제하시겠습니까? 업로드된 사진과 상세 내용이 모두 삭제됩니다.`,
       async () => {
         await PortfolioStorage.deleteItem(item.id);
-        onDataChanged();
+        await onDataChanged();
       }
     );
   };
@@ -396,10 +456,16 @@ export const AdminModal: React.FC<AdminModalProps> = ({
   // Create Submenu (서브 메뉴 새로 생성)
   const handleCreateSubmenu = async (catId: string) => {
     if (!newSubmenuName.trim()) return;
-    const created = await PortfolioStorage.addSubmenu(catId, newSubmenuName.trim());
+    let created;
+    try {
+      created = await PortfolioStorage.addSubmenu(catId, newSubmenuName.trim());
+    } catch (err) {
+      alert(errorMessage(err, '서브메뉴 생성 중 오류가 발생했습니다.'));
+      return;
+    }
     if (created) {
       setNewSubmenuName('');
-      onDataChanged();
+      await onDataChanged();
       // If currently editing, select this newly created submenu
       if (isEditing) {
         setSubmenuId(created.id);
@@ -414,7 +480,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
       `'${subName || '서브메뉴'}' 서브메뉴를 삭제하시겠습니까? 해당 서브메뉴에 속한 자료는 카테고리에 안전하게 유지됩니다.`,
       async () => {
         await PortfolioStorage.deleteSubmenu(catId, subId);
-        onDataChanged();
+        await onDataChanged();
       }
     );
   };
@@ -422,12 +488,16 @@ export const AdminModal: React.FC<AdminModalProps> = ({
   // Create Top Category
   const handleCreateCategory = async () => {
     if (!newCategoryLabel.trim()) return;
-    const cat = await PortfolioStorage.addCategory(newCategoryLabel.trim());
-    if (cat) {
-      setNewCategoryLabel('');
-      onDataChanged();
-    } else {
-      setFormFeedback({ type: 'error', message: '이미 존재하는 카테고리이거나 생성이 불가능합니다.' });
+    try {
+      const cat = await PortfolioStorage.addCategory(newCategoryLabel.trim());
+      if (cat) {
+        setNewCategoryLabel('');
+        await onDataChanged();
+      } else {
+        alert('이미 존재하는 카테고리이거나 생성이 불가능합니다.');
+      }
+    } catch (err) {
+      alert(errorMessage(err, '카테고리 생성 중 오류가 발생했습니다.'));
     }
   };
 
@@ -438,7 +508,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
       `'${catLabel || '카테고리'}' 카테고리를 삭제하시겠습니까? 포함된 하위 서브메뉴가 함께 삭제됩니다.`,
       async () => {
         await PortfolioStorage.deleteCategory(catId);
-        onDataChanged();
+        await onDataChanged();
       }
     );
   };
@@ -446,23 +516,25 @@ export const AdminModal: React.FC<AdminModalProps> = ({
   // About CMS Handlers (Home 상단 About 내용 수정)
   const handlePortraitUpload = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
+    setAboutFeedback({ type: 'success', message: '사진을 업로드하는 중입니다...' });
     try {
-      const dataUrl = await readFileAsDataUrl(files[0]);
-      setAboutProfile((prev) => ({ ...prev, portraitImage: dataUrl }));
+      const url = await PortfolioStorage.uploadImage(files[0]);
+      setAboutProfile((prev) => ({ ...prev, portraitImage: url }));
       setAboutFeedback({ type: 'success', message: '인물 프로필 사진이 등록되었습니다. 하단 [저장하기]를 눌러 적용하세요.' });
-    } catch {
-      setAboutFeedback({ type: 'error', message: '사진 파일을 읽는 중 오류가 발생했습니다.' });
+    } catch (err) {
+      setAboutFeedback({ type: 'error', message: errorMessage(err, '사진 업로드 중 오류가 발생했습니다.') });
     }
   };
 
   const handleSwimmingUpload = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
+    setAboutFeedback({ type: 'success', message: '사진을 업로드하는 중입니다...' });
     try {
-      const dataUrl = await readFileAsDataUrl(files[0]);
-      setAboutProfile((prev) => ({ ...prev, swimmingImage: dataUrl }));
+      const url = await PortfolioStorage.uploadImage(files[0]);
+      setAboutProfile((prev) => ({ ...prev, swimmingImage: url }));
       setAboutFeedback({ type: 'success', message: '수영/경기 사진이 등록되었습니다. 하단 [저장하기]를 눌러 적용하세요.' });
-    } catch {
-      setAboutFeedback({ type: 'error', message: '사진 파일을 읽는 중 오류가 발생했습니다.' });
+    } catch (err) {
+      setAboutFeedback({ type: 'error', message: errorMessage(err, '사진 업로드 중 오류가 발생했습니다.') });
     }
   };
 
@@ -491,37 +563,83 @@ export const AdminModal: React.FC<AdminModalProps> = ({
     });
   };
 
-  const handleSaveAboutProfile = (e: React.FormEvent) => {
+  const handleSaveAboutProfile = async (e: React.FormEvent) => {
     e.preventDefault();
+    setAboutSaving(true);
     try {
-      PortfolioStorage.saveProfile(aboutProfile);
-      onDataChanged();
+      await PortfolioStorage.saveProfile(aboutProfile, savedProfile);
+      setSavedProfile(aboutProfile);
+      await onDataChanged();
       setAboutFeedback({ type: 'success', message: 'Home 상단 About 소개 내용이 성공적으로 저장되었습니다!' });
       setTimeout(() => setAboutFeedback(null), 4000);
-    } catch {
-      setAboutFeedback({ type: 'error', message: '저장 중 오류가 발생했습니다.' });
+    } catch (err) {
+      setAboutFeedback({ type: 'error', message: errorMessage(err, '저장 중 오류가 발생했습니다.') });
+    } finally {
+      setAboutSaving(false);
     }
   };
 
   // Change Admin Password
-  const handleChangePassword = (e: React.FormEvent) => {
+  const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newPassword.trim()) return;
-    PortfolioStorage.setAdminPassword(newPassword.trim());
+    if (supabase) {
+      if (newPassword.trim().length < 6) {
+        setPasswordSuccess('비밀번호는 6자 이상이어야 합니다.');
+        return;
+      }
+      const { error } = await supabase.auth.updateUser({ password: newPassword.trim() });
+      if (error) {
+        setPasswordSuccess(`비밀번호 변경 실패: ${error.message}`);
+        return;
+      }
+    } else {
+      PortfolioStorage.setAdminPassword(newPassword.trim());
+    }
     setPasswordSuccess('비밀번호가 성공적으로 변경되었습니다!');
     setNewPassword('');
     setTimeout(() => setPasswordSuccess(''), 3000);
+  };
+
+  // 이 브라우저에 저장돼 있던 자료를 Supabase로 옮기기
+  const handleMigrateToCloud = () => {
+    promptDelete(
+      '클라우드로 자료 옮기기',
+      '이 브라우저에 저장된 자료, 카테고리, About 내용과 사진을 Supabase로 옮깁니다. 현재 클라우드에 있는 내용은 이 브라우저의 내용으로 덮어쓰여집니다. 계속하시겠습니까?',
+      async () => {
+        setMigrating(true);
+        setMigrationMessage({ type: 'info', message: '이전을 시작합니다...' });
+        try {
+          const result = await PortfolioStorage.migrateLocalToCloud((message) =>
+            setMigrationMessage({ type: 'info', message })
+          );
+          await onDataChanged();
+          await reloadAboutProfile();
+          setMigrationMessage({
+            type: 'success',
+            message: `이전 완료: 자료 ${result.items}개, 사진 ${result.images}장을 Supabase로 옮겼습니다.`
+          });
+        } catch (err) {
+          setMigrationMessage({ type: 'error', message: errorMessage(err, '이전 중 오류가 발생했습니다.') });
+        } finally {
+          setMigrating(false);
+        }
+      },
+      '옮기기'
+    );
   };
 
   // Reset to Factory Default Data with confirmation dialog
   const handleResetDefaults = () => {
     promptDelete(
       '전체 데이터 초기화 확인',
-      '모든 포트폴리오 자료와 카테고리를 잭슨 홍(Jackson Hong)의 기본 예시 데이터로 초기화하시겠습니까? 초기 비밀번호는 1111로 복원됩니다.',
+      PortfolioStorage.isCloud
+        ? '클라우드(Supabase)에 저장된 모든 자료, 카테고리, About 내용을 기본 예시 데이터로 초기화하시겠습니까? 모든 방문자에게 바로 적용됩니다.'
+        : '모든 포트폴리오 자료와 카테고리를 잭슨 홍(Jackson Hong)의 기본 예시 데이터로 초기화하시겠습니까? 초기 비밀번호는 1111로 복원됩니다.',
       async () => {
         await PortfolioStorage.resetToDefaults();
-        onDataChanged();
-        setAboutProfile(PortfolioStorage.getProfile());
+        await onDataChanged();
+        await reloadAboutProfile();
         setFormFeedback({ type: 'success', message: '기본 예시 데이터로 복원되었습니다.' });
       }
     );
@@ -653,18 +771,33 @@ export const AdminModal: React.FC<AdminModalProps> = ({
               관리자 인증
             </h3>
             <p className="text-xs text-neutral-400 mb-6">
-              포트폴리오 자료와 서브 메뉴를 관리하려면 비밀번호를 입력해주세요.
+              {supabase
+                ? 'Supabase에 등록한 관리자 이메일과 비밀번호로 로그인해주세요.'
+                : '포트폴리오 자료와 서브 메뉴를 관리하려면 비밀번호를 입력해주세요.'}
             </p>
 
             <form onSubmit={handleLogin} className="w-full space-y-4">
-              <div>
+              <div className="space-y-2">
+                {supabase && (
+                  <input
+                    type="email"
+                    value={emailInput}
+                    onChange={(e) => setEmailInput(e.target.value)}
+                    placeholder="관리자 이메일"
+                    autoComplete="username"
+                    className="w-full bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-center text-sm text-white placeholder-neutral-500 focus:outline-none focus:border-amber-400"
+                    autoFocus
+                    required
+                  />
+                )}
                 <input
                   type="password"
                   value={passwordInput}
                   onChange={(e) => setPasswordInput(e.target.value)}
-                  placeholder="비밀번호 입력 (초기: 1111)"
+                  placeholder={supabase ? '비밀번호' : '비밀번호 입력 (초기: 1111)'}
+                  autoComplete="current-password"
                   className="w-full bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-center text-base text-white placeholder-neutral-500 focus:outline-none focus:border-amber-400 font-mono tracking-widest"
-                  autoFocus
+                  autoFocus={!supabase}
                 />
                 {passwordError && (
                   <p className="text-xs text-red-400 mt-2 font-medium">{passwordError}</p>
@@ -673,14 +806,17 @@ export const AdminModal: React.FC<AdminModalProps> = ({
 
               <button
                 type="submit"
-                className="cursor-pointer w-full py-3 rounded-xl bg-amber-500 text-neutral-950 font-bold text-sm hover:bg-amber-400 active:bg-amber-600 transition-colors shadow-lg shadow-amber-500/10"
+                disabled={loggingIn}
+                className="cursor-pointer disabled:opacity-60 w-full py-3 rounded-xl bg-amber-500 text-neutral-950 font-bold text-sm hover:bg-amber-400 active:bg-amber-600 transition-colors shadow-lg shadow-amber-500/10"
               >
-                로그인 (Login)
+                {loggingIn ? '로그인 중...' : '로그인 (Login)'}
               </button>
 
-              <div className="pt-2 text-xs text-neutral-400 font-medium">
-                안내: 초기 관리자 비밀번호는 <strong className="text-amber-400 font-mono">1111</strong> 입니다.
-              </div>
+              {!supabase && (
+                <div className="pt-2 text-xs text-neutral-400 font-medium">
+                  안내: 초기 관리자 비밀번호는 <strong className="text-amber-400 font-mono">1111</strong> 입니다.
+                </div>
+              )}
             </form>
           </div>
         ) : (
@@ -1032,6 +1168,13 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                       </p>
                     </div>
 
+                    {uploadingCount > 0 && (
+                      <p className="text-[11px] text-amber-400 font-medium flex items-center gap-1.5">
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        사진 {uploadingCount}장 업로드 중...
+                      </p>
+                    )}
+
                     {/* Uploaded Images Preview Strip */}
                     {galleryImages.length > 0 && (
                       <div className="space-y-2 pt-2">
@@ -1219,9 +1362,10 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                     </button>
                     <button
                       type="submit"
-                      className="cursor-pointer px-6 py-2.5 text-xs font-bold text-neutral-950 bg-amber-500 hover:bg-amber-400 rounded-lg transition-colors shadow-lg shadow-amber-500/10"
+                      disabled={savingItem || uploadingCount > 0}
+                      className="cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed px-6 py-2.5 text-xs font-bold text-neutral-950 bg-amber-500 hover:bg-amber-400 rounded-lg transition-colors shadow-lg shadow-amber-500/10"
                     >
-                      {editItemId ? '수정사항 저장' : '새 자료 등록'}
+                      {savingItem ? '저장 중...' : editItemId ? '수정사항 저장' : '새 자료 등록'}
                     </button>
                   </div>
                 </form>
@@ -1695,7 +1839,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                     <button
                       type="button"
                       onClick={() => {
-                        setAboutProfile(PortfolioStorage.getProfile());
+                        setAboutProfile(savedProfile);
                         setAboutFeedback(null);
                       }}
                       className="cursor-pointer px-4 py-2.5 text-xs font-medium text-neutral-400 hover:text-white bg-neutral-800 rounded-lg transition-colors"
@@ -1704,15 +1848,63 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                     </button>
                     <button
                       type="submit"
-                      className="cursor-pointer px-6 py-2.5 text-xs font-bold text-neutral-950 bg-amber-500 hover:bg-amber-400 rounded-lg transition-colors shadow-lg shadow-amber-500/10"
+                      disabled={aboutSaving}
+                      className="cursor-pointer disabled:opacity-60 px-6 py-2.5 text-xs font-bold text-neutral-950 bg-amber-500 hover:bg-amber-400 rounded-lg transition-colors shadow-lg shadow-amber-500/10"
                     >
-                      저장하기
+                      {aboutSaving ? '저장 중...' : '저장하기'}
                     </button>
                   </div>
                 </form>
               ) : (
                 /* -------------------- 5. SETTINGS TAB -------------------- */
                 <div className="space-y-6 max-w-xl mx-auto">
+                  {/* Storage mode */}
+                  <div
+                    className={`p-6 rounded-xl border space-y-3 ${
+                      PortfolioStorage.isCloud ? 'border-emerald-900/60 bg-emerald-950/10' : 'border-neutral-800 bg-neutral-950/60'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 text-sm font-bold text-white">
+                      <Upload className={`w-4 h-4 ${PortfolioStorage.isCloud ? 'text-emerald-400' : 'text-neutral-400'}`} />
+                      <span>저장 위치: {PortfolioStorage.isCloud ? '클라우드 (Supabase)' : '이 브라우저'}</span>
+                    </div>
+                    <p className="text-xs text-neutral-400 leading-relaxed">
+                      {PortfolioStorage.isCloud
+                        ? '자료와 사진이 Supabase에 저장되어 모든 기기와 방문자에게 바로 반영됩니다.'
+                        : 'Supabase 환경변수가 설정되지 않아 이 브라우저에만 저장됩니다. 다른 기기나 방문자에게는 보이지 않습니다.'}
+                    </p>
+
+                    {PortfolioStorage.isCloud && (
+                      <div className="pt-2 space-y-2 border-t border-neutral-800">
+                        <p className="text-xs text-neutral-300 font-semibold">이 브라우저의 기존 자료를 클라우드로 옮기기</p>
+                        <p className="text-[11px] text-neutral-400 leading-relaxed">
+                          Supabase를 쓰기 전에 이 브라우저에서 등록하거나 수정한 자료와 사진을 클라우드로 한 번에 옮깁니다.
+                          예전에 작업하던 브라우저에서 실행해 주세요. 현재 클라우드 내용은 덮어쓰여집니다.
+                        </p>
+                        {migrationMessage && (
+                          <p
+                            className={`text-[11px] font-medium break-words ${
+                              migrationMessage.type === 'success'
+                                ? 'text-emerald-400'
+                                : migrationMessage.type === 'error'
+                                ? 'text-red-400'
+                                : 'text-amber-400'
+                            }`}
+                          >
+                            {migrationMessage.message}
+                          </p>
+                        )}
+                        <button
+                          onClick={handleMigrateToCloud}
+                          disabled={migrating}
+                          className="cursor-pointer disabled:opacity-60 px-4 py-2 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 font-semibold text-xs rounded-lg transition-colors border border-emerald-500/30"
+                        >
+                          {migrating ? '옮기는 중...' : '이 브라우저 자료를 Supabase로 옮기기'}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
                   {/* Change Password */}
                   <div className="p-6 rounded-xl border border-neutral-800 bg-neutral-950/60 space-y-4">
                     <div className="flex items-center gap-2 text-sm font-bold text-white">
@@ -1720,7 +1912,9 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                       <span>관리자 비밀번호 변경</span>
                     </div>
                     <p className="text-xs text-neutral-400">
-                      현재 설정된 비밀번호를 새로운 비밀번호로 변경할 수 있습니다. (초기 비밀번호: 1111)
+                      {PortfolioStorage.isCloud
+                        ? '현재 로그인한 Supabase 관리자 계정의 비밀번호를 변경합니다. (6자 이상)'
+                        : '현재 설정된 비밀번호를 새로운 비밀번호로 변경할 수 있습니다. (초기 비밀번호: 1111)'}
                     </p>
 
                     <form onSubmit={handleChangePassword} className="space-y-3">
@@ -1732,7 +1926,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                         className="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-amber-400 font-mono"
                       />
                       {passwordSuccess && (
-                        <p className="text-xs text-emerald-400">{passwordSuccess}</p>
+                        <p className={`text-xs ${passwordSuccess.includes('성공') ? 'text-emerald-400' : 'text-red-400'}`}>{passwordSuccess}</p>
                       )}
                       <button
                         type="submit"
@@ -1751,7 +1945,11 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                     </div>
                     <p className="text-xs text-neutral-400 leading-relaxed">
                       모든 포트폴리오 자료와 서브 메뉴를 Jackson Hong의 기본 상태로 되돌립니다.
-                      비밀번호도 초기 비밀번호인 <strong className="text-amber-400 font-mono">1111</strong>로 재설정됩니다.
+                      {PortfolioStorage.isCloud ? (
+                        <> 클라우드 데이터가 초기화되어 <strong className="text-red-300">모든 방문자에게 바로 적용</strong>됩니다.</>
+                      ) : (
+                        <> 비밀번호도 초기 비밀번호인 <strong className="text-amber-400 font-mono">1111</strong>로 재설정됩니다.</>
+                      )}
                     </p>
                     <button
                       onClick={handleResetDefaults}
@@ -1772,6 +1970,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
         title={deleteConfirm.title}
         description={deleteConfirm.description}
         onConfirm={deleteConfirm.onConfirm}
+        confirmLabel={deleteConfirm.confirmLabel}
         onCancel={closeDeleteConfirm}
       />
     </div>

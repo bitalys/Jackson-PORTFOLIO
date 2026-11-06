@@ -1,4 +1,5 @@
 import { Category, PortfolioItem, SiteProfile, Submenu } from '../types/portfolio';
+import { supabase, isCloudEnabled, MEDIA_BUCKET } from '../lib/supabase';
 import heroGolfAsset from '../assets/images/jackson_hero_golf_1793837637636.jpg';
 import swimmingAsset from '../assets/images/jackson_swimming_action_1793837638448.jpg';
 import portraitAsset from '../assets/images/jackson_portrait_headshot_1793837638258.jpg';
@@ -263,58 +264,6 @@ export function extractYouTubeId(url: string): string {
   return '';
 }
 
-// Convert uploaded file from user's computer into base64 data URL with optional client-side optimization
-export function readFileAsDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    // If it's an image, we can optionally resize if exceedingly large (>5MB) to keep IndexedDB snappy
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const result = e.target?.result as string;
-      if (!result) {
-        reject(new Error('Failed to read file'));
-        return;
-      }
-
-      // If file is > 3MB, downscale via canvas to keep preview lightning fast
-      if (file.size > 3 * 1024 * 1024 && file.type.startsWith('image/')) {
-        const img = new Image();
-        img.onload = () => {
-          const canvas = document.createElement('canvas');
-          const maxDim = 1920;
-          let width = img.width;
-          let height = img.height;
-
-          if (width > maxDim || height > maxDim) {
-            if (width > height) {
-              height = Math.round((height * maxDim) / width);
-              width = maxDim;
-            } else {
-              width = Math.round((width * maxDim) / height);
-              height = maxDim;
-            }
-          }
-
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext('2d');
-          if (ctx) {
-            ctx.drawImage(img, 0, 0, width, height);
-            resolve(canvas.toDataURL('image/jpeg', 0.88));
-          } else {
-            resolve(result);
-          }
-        };
-        img.onerror = () => resolve(result);
-        img.src = result;
-      } else {
-        resolve(result);
-      }
-    };
-    reader.onerror = (err) => reject(err);
-    reader.readAsDataURL(file);
-  });
-}
-
 // IndexedDB Helper
 function openDatabase(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -342,27 +291,147 @@ function openDatabase(): Promise<IDBDatabase> {
   });
 }
 
-// Storage Service API
-export const PortfolioStorage = {
-  // Get Categories & Submenus
-  async getCategories(): Promise<Category[]> {
+// ---------------------------------------------------------------------------
+// Image helpers
+// ---------------------------------------------------------------------------
+
+/** 사진을 긴 변 maxDim 이하의 JPEG로 줄입니다. (GIF/SVG 또는 실패 시 원본 그대로) */
+export function resizeImageFile(file: File, maxDim = 1600, quality = 0.85): Promise<Blob> {
+  if (!file.type.startsWith('image/') || file.type === 'image/gif' || file.type === 'image/svg+xml') {
+    return Promise.resolve(file);
+  }
+  return new Promise((resolve) => {
+    const objectUrl = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      let { width, height } = img;
+      const scale = Math.min(1, maxDim / Math.max(width, height));
+      width = Math.round(width * scale);
+      height = Math.round(height * scale);
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return resolve(file);
+      ctx.drawImage(img, 0, 0, width, height);
+      canvas.toBlob((blob) => resolve(blob && blob.size < file.size ? blob : file), 'image/jpeg', quality);
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      resolve(file);
+    };
+    img.src = objectUrl;
+  });
+}
+
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function dataUrlToBlob(dataUrl: string): Promise<Blob> {
+  const res = await fetch(dataUrl);
+  return res.blob();
+}
+
+/** 기본 예시 사진(빌드 시 파일명이 바뀌는 번들 이미지)을 현재 빌드 경로로 보정 */
+function normalizeMedia(item: PortfolioItem): PortfolioItem {
+  const fix = (img: string) => {
+    if (!img || img.includes('jackson_hero_golf')) return HERO_GOLF_IMAGE;
+    if (img.includes('jackson_swimming_action')) return SWIMMING_IMAGE;
+    if (img.includes('jackson_portrait_headshot')) return PORTRAIT_IMAGE;
+    return img;
+  };
+  const cover = fix(item.coverImage);
+  const gallery = Array.from(
+    new Set((item.galleryImages || []).filter(Boolean).map(fix).filter((img) => img !== cover))
+  );
+
+  // Update old un-embeddable test video ID to verified videos
+  let youtubeVideoId = item.youtubeVideoId;
+  let youtubeUrl = item.youtubeUrl;
+  if (youtubeVideoId === 'ScMzIvxBSi4') {
+    youtubeVideoId = item.id === 'item-golf-1' ? 'rh1x18eIhco' : 'OQsQQk-n-7A';
+    youtubeUrl = `https://www.youtube.com/watch?v=${youtubeVideoId}`;
+  }
+
+  return { ...item, coverImage: cover, galleryImages: gallery, youtubeVideoId, youtubeUrl };
+}
+
+function normalizeProfile(profile: SiteProfile): SiteProfile {
+  const fix = (img?: string) => {
+    if (!img) return img;
+    if (img.includes('jackson_swimming_action')) return SWIMMING_IMAGE;
+    if (img.includes('jackson_portrait_headshot')) return PORTRAIT_IMAGE;
+    return img;
+  };
+  return { ...profile, portraitImage: fix(profile.portraitImage), swimmingImage: fix(profile.swimmingImage) };
+}
+
+const sortItems = (items: PortfolioItem[]) => [...items].sort((a, b) => b.createdAt - a.createdAt);
+
+// ---------------------------------------------------------------------------
+// Backend interface: 브라우저 저장소(Local) 또는 Supabase(Cloud)
+// ---------------------------------------------------------------------------
+
+interface StorageBackend {
+  getCategories(): Promise<Category[]>;
+  saveCategories(categories: Category[]): Promise<void>;
+  getItems(): Promise<PortfolioItem[]>;
+  insertItem(item: PortfolioItem): Promise<void>;
+  updateItem(item: PortfolioItem, previous: PortfolioItem): Promise<void>;
+  deleteItem(item: PortfolioItem): Promise<void>;
+  getProfile(): Promise<SiteProfile>;
+  saveProfile(profile: SiteProfile, previous?: SiteProfile): Promise<void>;
+  uploadImage(file: File): Promise<string>;
+  replaceAll(categories: Category[], items: PortfolioItem[], profile: SiteProfile): Promise<void>;
+}
+
+// ----------------------------- Local (browser) -----------------------------
+
+function idbRequest<T>(req: IDBRequest<T>): Promise<T> {
+  return new Promise((resolve, reject) => {
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+function idbDone(tx: IDBTransaction): Promise<void> {
+  return new Promise((resolve, reject) => {
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error || new Error('저장이 중단되었습니다. (저장 공간 부족 가능성)'));
+  });
+}
+
+const LocalBackend: StorageBackend = {
+  async getCategories() {
     try {
       const db = await openDatabase();
-      const tx = db.transaction(STORE_CATEGORIES, 'readonly');
-      const store = tx.objectStore(STORE_CATEGORIES);
-      const req = store.getAll();
-      const result = await new Promise<Category[]>((resolve) => {
-        req.onsuccess = () => resolve(req.result || []);
-        req.onerror = () => resolve([]);
-      });
-
+      const result = await idbRequest<Category[]>(
+        db.transaction(STORE_CATEGORIES, 'readonly').objectStore(STORE_CATEGORIES).getAll()
+      );
       if (result && result.length > 0) {
+        // IndexedDB는 id 순으로 돌려주므로, 저장했던 순서(localStorage 사본)대로 다시 정렬
+        try {
+          const order: string[] = JSON.parse(localStorage.getItem(LOCAL_STORAGE_CATEGORIES_KEY) || '[]').map(
+            (c: Category) => c.id
+          );
+          const rank = (id: string) => (order.indexOf(id) === -1 ? Number.MAX_SAFE_INTEGER : order.indexOf(id));
+          result.sort((a, b) => rank(a.id) - rank(b.id));
+        } catch {
+          // keep IndexedDB order
+        }
         return result;
       }
     } catch {
-      // Fallback to localStorage
+      // fall back to localStorage
     }
-
     const local = localStorage.getItem(LOCAL_STORAGE_CATEGORIES_KEY);
     if (local) {
       try {
@@ -371,264 +440,67 @@ export const PortfolioStorage = {
         // ignore
       }
     }
-
-    // Seed defaults
     await this.saveCategories(DEFAULT_CATEGORIES);
     return DEFAULT_CATEGORIES;
   },
 
-  // Save Categories & Submenus
-  async saveCategories(categories: Category[]): Promise<void> {
+  async saveCategories(categories) {
     try {
       localStorage.setItem(LOCAL_STORAGE_CATEGORIES_KEY, JSON.stringify(categories));
-      const db = await openDatabase();
-      const tx = db.transaction(STORE_CATEGORIES, 'readwrite');
-      const store = tx.objectStore(STORE_CATEGORIES);
-      store.clear();
-      for (const cat of categories) {
-        store.put(cat);
-      }
     } catch {
-      localStorage.setItem(LOCAL_STORAGE_CATEGORIES_KEY, JSON.stringify(categories));
+      // IndexedDB is the primary store
     }
+    const db = await openDatabase();
+    const tx = db.transaction(STORE_CATEGORIES, 'readwrite');
+    const store = tx.objectStore(STORE_CATEGORIES);
+    store.clear();
+    categories.forEach((cat) => store.put(cat));
+    await idbDone(tx);
   },
 
-  // Get All Portfolio Items
-  async getItems(): Promise<PortfolioItem[]> {
-    const normalizeMedia = (item: PortfolioItem): PortfolioItem => {
-      let cover = item.coverImage;
-      if (!cover || cover.includes('jackson_hero_golf')) {
-        cover = HERO_GOLF_IMAGE;
-      } else if (cover.includes('jackson_swimming_action')) {
-        cover = SWIMMING_IMAGE;
-      } else if (cover.includes('jackson_portrait_headshot')) {
-        cover = PORTRAIT_IMAGE;
-      }
-
-      const gallery = Array.from(
-        new Set(
-          (item.galleryImages || [])
-            .map(img => {
-              if (!img || img.includes('jackson_hero_golf')) return HERO_GOLF_IMAGE;
-              if (img.includes('jackson_swimming_action')) return SWIMMING_IMAGE;
-              if (img.includes('jackson_portrait_headshot')) return PORTRAIT_IMAGE;
-              return img;
-            })
-            .filter(img => Boolean(img) && img !== cover)
-        )
-      );
-
-      // Update old un-embeddable Rick Astley test video ID to verified USGA Junior Championship video
-      let youtubeId = item.youtubeVideoId;
-      let youtubeUrl = item.youtubeUrl;
-      if (youtubeId === 'ScMzIvxBSi4') {
-        if (item.id === 'item-golf-1') {
-          youtubeId = 'rh1x18eIhco';
-          youtubeUrl = 'https://www.youtube.com/watch?v=rh1x18eIhco';
-        } else {
-          youtubeId = 'OQsQQk-n-7A';
-          youtubeUrl = 'https://www.youtube.com/watch?v=OQsQQk-n-7A';
-        }
-      }
-
-      return {
-        ...item,
-        coverImage: cover,
-        galleryImages: gallery,
-        youtubeVideoId: youtubeId,
-        youtubeUrl
-      };
-    };
-
+  async getItems() {
     try {
       const db = await openDatabase();
-      const tx = db.transaction(STORE_ITEMS, 'readonly');
-      const store = tx.objectStore(STORE_ITEMS);
-      const req = store.getAll();
-      const result = await new Promise<PortfolioItem[]>((resolve) => {
-        req.onsuccess = () => resolve(req.result || []);
-        req.onerror = () => resolve([]);
-      });
-
-      if (result && result.length > 0) {
-        return result.map(normalizeMedia).sort((a, b) => b.createdAt - a.createdAt);
-      }
+      const result = await idbRequest<PortfolioItem[]>(
+        db.transaction(STORE_ITEMS, 'readonly').objectStore(STORE_ITEMS).getAll()
+      );
+      if (result && result.length > 0) return sortItems(result.map(normalizeMedia));
     } catch {
-      // Fallback
+      // fall back to localStorage
     }
-
     const local = localStorage.getItem(LOCAL_STORAGE_ITEMS_KEY);
     if (local) {
       try {
         const parsed = JSON.parse(local);
-        if (parsed.length > 0) return parsed.map(normalizeMedia).sort((a: PortfolioItem, b: PortfolioItem) => b.createdAt - a.createdAt);
+        if (parsed.length > 0) return sortItems(parsed.map(normalizeMedia));
       } catch {
         // ignore
       }
     }
-
-    // Seed default items
-    await this.saveItems(DEFAULT_ITEMS);
+    await saveLocalItems(DEFAULT_ITEMS);
     return DEFAULT_ITEMS;
   },
 
-  // Save All Items
-  async saveItems(items: PortfolioItem[]): Promise<void> {
-    try {
-      // Save items to IndexedDB
-      const db = await openDatabase();
-      const tx = db.transaction(STORE_ITEMS, 'readwrite');
-      const store = tx.objectStore(STORE_ITEMS);
-      store.clear();
-      for (const item of items) {
-        store.put(item);
-      }
-
-      // Also save lightweight copy in localStorage (without massive data URLs if any)
-      const lightweight = items.map(item => ({
-        ...item,
-        coverImage: item.coverImage.startsWith('data:') && item.coverImage.length > 200000 ? '' : item.coverImage,
-        galleryImages: item.galleryImages.filter(img => !img.startsWith('data:') || img.length < 200000)
-      }));
-      localStorage.setItem(LOCAL_STORAGE_ITEMS_KEY, JSON.stringify(lightweight));
-    } catch {
-      try {
-        localStorage.setItem(LOCAL_STORAGE_ITEMS_KEY, JSON.stringify(items));
-      } catch {
-        // storage quota fallback
-      }
-    }
-  },
-
-  // Create single item
-  async createItem(item: Omit<PortfolioItem, 'id' | 'createdAt' | 'updatedAt'>): Promise<PortfolioItem> {
+  async insertItem(item) {
     const items = await this.getItems();
-    const newItem: PortfolioItem = {
-      ...item,
-      id: `item-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
-      createdAt: Date.now(),
-      updatedAt: Date.now()
-    };
-    items.unshift(newItem);
-    await this.saveItems(items);
-    return newItem;
+    await saveLocalItems([item, ...items]);
   },
 
-  // Update single item
-  async updateItem(id: string, updates: Partial<PortfolioItem>): Promise<PortfolioItem | null> {
+  async updateItem(item) {
     const items = await this.getItems();
-    const idx = items.findIndex(i => i.id === id);
-    if (idx === -1) return null;
-
-    const updatedItem: PortfolioItem = {
-      ...items[idx],
-      ...updates,
-      updatedAt: Date.now()
-    };
-    items[idx] = updatedItem;
-    await this.saveItems(items);
-    return updatedItem;
+    await saveLocalItems(items.map((i) => (i.id === item.id ? item : i)));
   },
 
-  // Delete item
-  async deleteItem(id: string): Promise<boolean> {
+  async deleteItem(item) {
     const items = await this.getItems();
-    const filtered = items.filter(i => i.id !== id);
-    if (filtered.length === items.length) return false;
-    await this.saveItems(filtered);
-    return true;
+    await saveLocalItems(items.filter((i) => i.id !== item.id));
   },
 
-  // Add a brand new submenu (e.g. ATHLETICS · GOLF, ATHLETICS · Swimming, etc.)
-  async addSubmenu(categoryId: string, submenuName: string): Promise<Submenu | null> {
-    const categories = await this.getCategories();
-    const cat = categories.find(c => c.id === categoryId);
-    if (!cat) return null;
-
-    const trimmed = submenuName.trim();
-    if (!trimmed) return null;
-
-    // Check duplicate
-    const existing = cat.submenus.find(s => s.name.toLowerCase() === trimmed.toLowerCase());
-    if (existing) return existing;
-
-    const id = `${categoryId}-${trimmed.toLowerCase().replace(/[^a-z0-9]/g, '-')}-${Date.now().toString().slice(-4)}`;
-    const newSub: Submenu = {
-      id,
-      name: trimmed,
-      categoryId
-    };
-
-    cat.submenus.push(newSub);
-    await this.saveCategories(categories);
-    return newSub;
-  },
-
-  // Delete a submenu
-  async deleteSubmenu(categoryId: string, submenuId: string): Promise<boolean> {
-    const categories = await this.getCategories();
-    const cat = categories.find(c => c.id === categoryId);
-    if (!cat) return false;
-
-    cat.submenus = cat.submenus.filter(s => s.id !== submenuId);
-    await this.saveCategories(categories);
-    return true;
-  },
-
-  // Add a brand new top Category
-  async addCategory(label: string, description?: string): Promise<Category | null> {
-    const categories = await this.getCategories();
-    const trimmed = label.trim().toUpperCase();
-    if (!trimmed) return null;
-
-    const id = trimmed.toLowerCase().replace(/[^a-z0-9]/g, '-');
-    if (categories.find(c => c.id === id)) {
-      return null;
-    }
-
-    const newCat: Category = {
-      id,
-      label: trimmed,
-      description: description || '',
-      submenus: []
-    };
-
-    categories.push(newCat);
-    await this.saveCategories(categories);
-    return newCat;
-  },
-
-  // Delete top category
-  async deleteCategory(categoryId: string): Promise<boolean> {
-    let categories = await this.getCategories();
-    const initialLen = categories.length;
-    categories = categories.filter(c => c.id !== categoryId);
-    if (categories.length === initialLen) return false;
-    await this.saveCategories(categories);
-    return true;
-  },
-
-  // Admin Password Management (Initial password: 1111)
-  getAdminPassword(): string {
-    const pwd = localStorage.getItem(LOCAL_STORAGE_PASSWORD_KEY);
-    return pwd || DEFAULT_ADMIN_PASSWORD;
-  },
-
-  setAdminPassword(newPassword: string): void {
-    localStorage.setItem(LOCAL_STORAGE_PASSWORD_KEY, newPassword);
-  },
-
-  verifyPassword(inputPassword: string): boolean {
-    const stored = this.getAdminPassword();
-    return inputPassword.trim() === stored;
-  },
-
-  // Profile data
-  getProfile(): SiteProfile {
+  async getProfile() {
     const stored = localStorage.getItem(LOCAL_STORAGE_PROFILE_KEY);
     if (stored) {
       try {
-        return JSON.parse(stored);
+        return normalizeProfile({ ...DEFAULT_PROFILE, ...JSON.parse(stored) });
       } catch {
         // ignore
       }
@@ -636,29 +508,447 @@ export const PortfolioStorage = {
     return DEFAULT_PROFILE;
   },
 
-  saveProfile(profile: SiteProfile): void {
-    localStorage.setItem(LOCAL_STORAGE_PROFILE_KEY, JSON.stringify(profile));
+  async saveProfile(profile) {
+    try {
+      localStorage.setItem(LOCAL_STORAGE_PROFILE_KEY, JSON.stringify(profile));
+    } catch {
+      throw new Error('브라우저 저장 공간이 부족해 저장하지 못했습니다. 사진 용량을 줄여 다시 시도해 주세요.');
+    }
   },
 
-  // Reset all data to factory showcase
-  async resetToDefaults(): Promise<void> {
+  async uploadImage(file) {
+    return blobToDataUrl(await resizeImageFile(file));
+  },
+
+  async replaceAll(categories, items, profile) {
     localStorage.removeItem(LOCAL_STORAGE_ITEMS_KEY);
     localStorage.removeItem(LOCAL_STORAGE_CATEGORIES_KEY);
-    localStorage.removeItem(LOCAL_STORAGE_PROFILE_KEY);
-    localStorage.removeItem(LOCAL_STORAGE_PASSWORD_KEY);
+    await this.saveCategories(categories);
+    await saveLocalItems(items);
+    await this.saveProfile(profile);
+  }
+};
 
-    try {
-      const db = await openDatabase();
-      const tx = db.transaction([STORE_ITEMS, STORE_CATEGORIES], 'readwrite');
-      tx.objectStore(STORE_ITEMS).clear();
-      tx.objectStore(STORE_CATEGORIES).clear();
-    } catch {
-      // ignore
+async function saveLocalItems(items: PortfolioItem[]): Promise<void> {
+  const db = await openDatabase();
+  const tx = db.transaction(STORE_ITEMS, 'readwrite');
+  const store = tx.objectStore(STORE_ITEMS);
+  store.clear();
+  items.forEach((item) => store.put(item));
+  await idbDone(tx);
+
+  // 보조 사본 (큰 사진 제외). 실패해도 IndexedDB 저장은 이미 완료됨.
+  try {
+    const lightweight = items.map((item) => ({
+      ...item,
+      coverImage: item.coverImage.startsWith('data:') && item.coverImage.length > 200000 ? '' : item.coverImage,
+      galleryImages: item.galleryImages.filter((img) => !img.startsWith('data:') || img.length < 200000)
+    }));
+    localStorage.setItem(LOCAL_STORAGE_ITEMS_KEY, JSON.stringify(lightweight));
+  } catch {
+    // ignore quota errors for the backup copy
+  }
+}
+
+/** 브라우저(IndexedDB/localStorage)에 남아 있는 데이터를 읽습니다. (클라우드 이전용) */
+async function readLocalData() {
+  return {
+    categories: await LocalBackend.getCategories(),
+    items: await LocalBackend.getItems(),
+    profile: await LocalBackend.getProfile()
+  };
+}
+
+// ------------------------------ Cloud (Supabase) ------------------------------
+
+interface ItemRow {
+  id: string;
+  title: string;
+  subtitle: string | null;
+  category_id: string | null;
+  submenu_id: string | null;
+  date: string | null;
+  featured: boolean | null;
+  media_type: string | null;
+  cover_image: string | null;
+  gallery_images: string[] | null;
+  youtube_url: string | null;
+  youtube_video_id: string | null;
+  summary: string | null;
+  details: string | null;
+  highlights: PortfolioItem['highlights'] | null;
+  external_link: string | null;
+  external_link_label: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+const toRow = (item: PortfolioItem): ItemRow => ({
+  id: item.id,
+  title: item.title,
+  subtitle: item.subtitle || null,
+  category_id: item.categoryId || null,
+  submenu_id: item.submenuId || null,
+  date: item.date || null,
+  featured: !!item.featured,
+  media_type: item.mediaType,
+  cover_image: item.coverImage || null,
+  gallery_images: item.galleryImages || [],
+  youtube_url: item.youtubeUrl || null,
+  youtube_video_id: item.youtubeVideoId || null,
+  summary: item.summary || null,
+  details: item.details || null,
+  highlights: item.highlights || [],
+  external_link: item.externalLink || null,
+  external_link_label: item.externalLinkLabel || null,
+  created_at: new Date(item.createdAt || Date.now()).toISOString(),
+  updated_at: new Date(item.updatedAt || Date.now()).toISOString()
+});
+
+const fromRow = (row: ItemRow): PortfolioItem => ({
+  id: row.id,
+  title: row.title,
+  subtitle: row.subtitle || '',
+  categoryId: row.category_id || '',
+  submenuId: row.submenu_id || '',
+  date: row.date || '',
+  featured: !!row.featured,
+  mediaType: (row.media_type as PortfolioItem['mediaType']) || 'both',
+  coverImage: row.cover_image || '',
+  galleryImages: row.gallery_images || [],
+  youtubeUrl: row.youtube_url || '',
+  youtubeVideoId: row.youtube_video_id || '',
+  summary: row.summary || '',
+  details: row.details || '',
+  highlights: row.highlights || [],
+  externalLink: row.external_link || '',
+  externalLinkLabel: row.external_link_label || '',
+  createdAt: Date.parse(row.created_at) || Date.now(),
+  updatedAt: Date.parse(row.updated_at) || Date.now()
+});
+
+function cloud() {
+  if (!supabase) throw new Error('Supabase 설정(환경변수)이 없습니다.');
+  return supabase;
+}
+
+function check<T extends { error: { message: string } | null }>(res: T, action: string): T {
+  if (res.error) throw new Error(`${action} 실패: ${res.error.message}`);
+  return res;
+}
+
+/** Supabase Storage에 올린 사진이면 버킷 내부 경로를 돌려줍니다. */
+function storagePathFromUrl(url?: string): string | null {
+  if (!url) return null;
+  const marker = `/storage/v1/object/public/${MEDIA_BUCKET}/`;
+  const idx = url.indexOf(marker);
+  return idx === -1 ? null : decodeURIComponent(url.slice(idx + marker.length).split('?')[0]);
+}
+
+/** 더 이상 쓰지 않는 사진 파일을 Storage에서 정리합니다. (실패해도 무시) */
+async function removeUnusedFiles(before: (string | undefined)[], after: (string | undefined)[]) {
+  const keep = new Set(after.filter(Boolean));
+  const paths = before
+    .filter((url) => url && !keep.has(url))
+    .map(storagePathFromUrl)
+    .filter((p): p is string => !!p);
+  if (paths.length === 0) return;
+  try {
+    await cloud().storage.from(MEDIA_BUCKET).remove(Array.from(new Set(paths)));
+  } catch {
+    // ignore cleanup failures
+  }
+}
+
+const itemImages = (item: PortfolioItem) => [item.coverImage, ...(item.galleryImages || [])];
+const profileImages = (p: SiteProfile) => [p.portraitImage, p.swimmingImage];
+
+/** 클라우드가 아직 비어 있으면(처음 사용) 기본 예시 데이터를 넣습니다. 관리자 쓰기 작업 전에 호출. */
+let seededChecked = false;
+async function ensureCloudSeeded() {
+  if (seededChecked) return;
+  const { data } = check(await cloud().from('site_profile').select('id').eq('id', 1).maybeSingle(), '초기 데이터 확인');
+  if (!data) {
+    await CloudBackend.replaceAll(DEFAULT_CATEGORIES, DEFAULT_ITEMS, DEFAULT_PROFILE);
+  }
+  seededChecked = true;
+}
+
+const CloudBackend: StorageBackend = {
+  async getCategories() {
+    const db = cloud();
+    const [cats, subs] = await Promise.all([
+      db.from('categories').select('*').order('sort_order'),
+      db.from('submenus').select('*').order('sort_order')
+    ]);
+    check(cats, '카테고리 불러오기');
+    check(subs, '서브메뉴 불러오기');
+    if (!cats.data || cats.data.length === 0) return DEFAULT_CATEGORIES;
+    return cats.data.map((c) => ({
+      id: c.id,
+      label: c.label,
+      description: c.description || '',
+      submenus: (subs.data || [])
+        .filter((s) => s.category_id === c.id)
+        .map((s) => ({ id: s.id, name: s.name, categoryId: s.category_id, order: s.sort_order }))
+    }));
+  },
+
+  async saveCategories(categories) {
+    const db = cloud();
+    const catRows = categories.map((c, i) => ({
+      id: c.id,
+      label: c.label,
+      description: c.description || '',
+      sort_order: i
+    }));
+    const subRows = categories.flatMap((c) =>
+      c.submenus.map((s, i) => ({ id: s.id, category_id: c.id, name: s.name, sort_order: i }))
+    );
+
+    check(await db.from('categories').upsert(catRows), '카테고리 저장');
+    if (subRows.length) check(await db.from('submenus').upsert(subRows), '서브메뉴 저장');
+
+    // 목록에서 빠진 서브메뉴 / 카테고리 삭제
+    const existingSubs = check(await db.from('submenus').select('id'), '서브메뉴 확인').data || [];
+    const subIds = new Set(subRows.map((s) => s.id));
+    const staleSubs = existingSubs.map((s) => s.id).filter((id) => !subIds.has(id));
+    if (staleSubs.length) check(await db.from('submenus').delete().in('id', staleSubs), '서브메뉴 삭제');
+
+    const existingCats = check(await db.from('categories').select('id'), '카테고리 확인').data || [];
+    const catIds = new Set(catRows.map((c) => c.id));
+    const staleCats = existingCats.map((c) => c.id).filter((id) => !catIds.has(id));
+    if (staleCats.length) check(await db.from('categories').delete().in('id', staleCats), '카테고리 삭제');
+  },
+
+  async getItems() {
+    const db = cloud();
+    const [items, profile] = await Promise.all([
+      db.from('items').select('*').order('created_at', { ascending: false }),
+      db.from('site_profile').select('id').eq('id', 1).maybeSingle()
+    ]);
+    check(items, '자료 불러오기');
+    // 아직 한 번도 저장한 적 없는 빈 클라우드라면 기본 예시를 보여줌
+    if ((!items.data || items.data.length === 0) && !profile.data) return DEFAULT_ITEMS;
+    return sortItems((items.data as ItemRow[]).map(fromRow).map(normalizeMedia));
+  },
+
+  async insertItem(item) {
+    await ensureCloudSeeded();
+    check(await cloud().from('items').insert(toRow(item)), '자료 등록');
+  },
+
+  async updateItem(item, previous) {
+    await ensureCloudSeeded();
+    check(await cloud().from('items').upsert(toRow(item)), '자료 수정');
+    await removeUnusedFiles(itemImages(previous), itemImages(item));
+  },
+
+  async deleteItem(item) {
+    await ensureCloudSeeded();
+    check(await cloud().from('items').delete().eq('id', item.id), '자료 삭제');
+    await removeUnusedFiles(itemImages(item), []);
+  },
+
+  async getProfile() {
+    const res = check(await cloud().from('site_profile').select('data').eq('id', 1).maybeSingle(), 'About 불러오기');
+    if (!res.data) return DEFAULT_PROFILE;
+    return normalizeProfile({ ...DEFAULT_PROFILE, ...(res.data.data as SiteProfile) });
+  },
+
+  async saveProfile(profile, previous) {
+    await ensureCloudSeeded();
+    check(await cloud().from('site_profile').upsert({ id: 1, data: profile }), 'About 저장');
+    if (previous) await removeUnusedFiles(profileImages(previous), profileImages(profile));
+  },
+
+  async uploadImage(file) {
+    const blob = await resizeImageFile(file);
+    const ext = blob.type === 'image/jpeg' ? 'jpg' : (file.name.split('.').pop() || 'img').toLowerCase();
+    const path = `uploads/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+    const bucket = cloud().storage.from(MEDIA_BUCKET);
+    check(await bucket.upload(path, blob, { contentType: blob.type || file.type, cacheControl: '31536000' }), '사진 업로드');
+    return bucket.getPublicUrl(path).data.publicUrl;
+  },
+
+  async replaceAll(categories, items, profile) {
+    const db = cloud();
+    await this.saveCategories(categories);
+
+    const rows = items.map(toRow);
+    if (rows.length) check(await db.from('items').upsert(rows), '자료 저장');
+    const existing = check(await db.from('items').select('id'), '자료 확인').data || [];
+    const ids = new Set(rows.map((r) => r.id));
+    const stale = existing.map((r) => r.id).filter((id) => !ids.has(id));
+    if (stale.length) check(await db.from('items').delete().in('id', stale), '자료 삭제');
+
+    check(await db.from('site_profile').upsert({ id: 1, data: profile }), 'About 저장');
+    seededChecked = true;
+  }
+};
+
+/** 사진 문자열이 data URL(브라우저 저장 방식)이면 Storage에 올리고 URL을 돌려줍니다. */
+async function uploadIfDataUrl(img: string | undefined, cache: Map<string, string>): Promise<string | undefined> {
+  if (!img || !img.startsWith('data:')) return img;
+  const cached = cache.get(img);
+  if (cached) return cached;
+  const blob = await dataUrlToBlob(img);
+  const file = new File([blob], `migrated.${blob.type.split('/')[1] || 'jpg'}`, { type: blob.type });
+  const url = await CloudBackend.uploadImage(file);
+  cache.set(img, url);
+  return url;
+}
+
+// ---------------------------------------------------------------------------
+// Public API used by the UI
+// ---------------------------------------------------------------------------
+
+const backend = (): StorageBackend => (isCloudEnabled ? CloudBackend : LocalBackend);
+
+export const PortfolioStorage = {
+  /** Supabase(클라우드) 사용 여부 */
+  isCloud: isCloudEnabled,
+
+  getCategories: () => backend().getCategories(),
+  getItems: () => backend().getItems(),
+  getProfile: () => backend().getProfile(),
+
+  async saveProfile(profile: SiteProfile, previous?: SiteProfile): Promise<void> {
+    await backend().saveProfile(profile, previous);
+  },
+
+  /** 사진 파일을 저장하고, 화면에 쓸 수 있는 주소(URL 또는 data URL)를 돌려줍니다. */
+  uploadImage: (file: File) => backend().uploadImage(file),
+
+  async createItem(item: Omit<PortfolioItem, 'id' | 'createdAt' | 'updatedAt'>): Promise<PortfolioItem> {
+    const now = Date.now();
+    const newItem: PortfolioItem = {
+      ...item,
+      id: `item-${now}-${Math.random().toString(36).slice(2, 8)}`,
+      createdAt: now,
+      updatedAt: now
+    };
+    await backend().insertItem(newItem);
+    return newItem;
+  },
+
+  async updateItem(id: string, updates: Partial<PortfolioItem>): Promise<PortfolioItem | null> {
+    const items = await backend().getItems();
+    const previous = items.find((i) => i.id === id);
+    if (!previous) return null;
+    const updated: PortfolioItem = { ...previous, ...updates, updatedAt: Date.now() };
+    await backend().updateItem(updated, previous);
+    return updated;
+  },
+
+  async deleteItem(id: string): Promise<boolean> {
+    const items = await backend().getItems();
+    const item = items.find((i) => i.id === id);
+    if (!item) return false;
+    await backend().deleteItem(item);
+    return true;
+  },
+
+  // Add a brand new submenu (e.g. ATHLETICS · GOLF, ATHLETICS · Swimming, etc.)
+  async addSubmenu(categoryId: string, submenuName: string): Promise<Submenu | null> {
+    const categories = await backend().getCategories();
+    const cat = categories.find((c) => c.id === categoryId);
+    const trimmed = submenuName.trim();
+    if (!cat || !trimmed) return null;
+
+    const existing = cat.submenus.find((s) => s.name.toLowerCase() === trimmed.toLowerCase());
+    if (existing) return existing;
+
+    const newSub: Submenu = {
+      id: `${categoryId}-${trimmed.toLowerCase().replace(/[^a-z0-9]/g, '-')}-${Date.now().toString().slice(-4)}`,
+      name: trimmed,
+      categoryId
+    };
+    cat.submenus.push(newSub);
+    await backend().saveCategories(categories);
+    return newSub;
+  },
+
+  async deleteSubmenu(categoryId: string, submenuId: string): Promise<boolean> {
+    const categories = await backend().getCategories();
+    const cat = categories.find((c) => c.id === categoryId);
+    if (!cat) return false;
+    cat.submenus = cat.submenus.filter((s) => s.id !== submenuId);
+    await backend().saveCategories(categories);
+    return true;
+  },
+
+  async addCategory(label: string, description?: string): Promise<Category | null> {
+    const categories = await backend().getCategories();
+    const trimmed = label.trim().toUpperCase();
+    if (!trimmed) return null;
+    const id = trimmed.toLowerCase().replace(/[^a-z0-9]/g, '-');
+    if (categories.find((c) => c.id === id)) return null;
+
+    const newCat: Category = { id, label: trimmed, description: description || '', submenus: [] };
+    categories.push(newCat);
+    await backend().saveCategories(categories);
+    return newCat;
+  },
+
+  async deleteCategory(categoryId: string): Promise<boolean> {
+    const categories = await backend().getCategories();
+    const filtered = categories.filter((c) => c.id !== categoryId);
+    if (filtered.length === categories.length) return false;
+    await backend().saveCategories(filtered);
+    return true;
+  },
+
+  // Local-mode admin password (클라우드 모드에서는 Supabase 로그인을 사용)
+  getAdminPassword(): string {
+    return localStorage.getItem(LOCAL_STORAGE_PASSWORD_KEY) || DEFAULT_ADMIN_PASSWORD;
+  },
+
+  setAdminPassword(newPassword: string): void {
+    localStorage.setItem(LOCAL_STORAGE_PASSWORD_KEY, newPassword);
+  },
+
+  verifyPassword(inputPassword: string): boolean {
+    return inputPassword.trim() === this.getAdminPassword();
+  },
+
+  /** 모든 자료를 기본 예시 데이터로 되돌립니다. (클라우드 모드에서는 모든 방문자에게 적용) */
+  async resetToDefaults(): Promise<void> {
+    await backend().replaceAll(DEFAULT_CATEGORIES, DEFAULT_ITEMS, DEFAULT_PROFILE);
+    if (!isCloudEnabled) this.setAdminPassword(DEFAULT_ADMIN_PASSWORD);
+  },
+
+  /**
+   * 이 브라우저에 저장돼 있던 자료(카테고리, 자료, About, 사진)를 Supabase로 옮깁니다.
+   * 사진(data URL)은 Storage에 업로드한 뒤 URL로 바꿔 저장합니다.
+   */
+  async migrateLocalToCloud(onProgress?: (message: string) => void): Promise<{ items: number; images: number }> {
+    if (!isCloudEnabled) throw new Error('Supabase 설정이 없어 이전할 수 없습니다.');
+    const { categories, items, profile } = await readLocalData();
+    const cache = new Map<string, string>();
+
+    const migratedItems: PortfolioItem[] = [];
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      onProgress?.(`자료 사진 업로드 중... (${i + 1}/${items.length}) ${item.title}`);
+      const cover = (await uploadIfDataUrl(item.coverImage, cache)) || '';
+      const gallery: string[] = [];
+      for (const img of item.galleryImages || []) {
+        const url = await uploadIfDataUrl(img, cache);
+        if (url) gallery.push(url);
+      }
+      migratedItems.push({ ...item, coverImage: cover, galleryImages: gallery });
     }
 
-    await this.saveCategories(DEFAULT_CATEGORIES);
-    await this.saveItems(DEFAULT_ITEMS);
-    this.saveProfile(DEFAULT_PROFILE);
-    this.setAdminPassword(DEFAULT_ADMIN_PASSWORD);
+    onProgress?.('About 사진 업로드 중...');
+    const migratedProfile: SiteProfile = {
+      ...profile,
+      portraitImage: await uploadIfDataUrl(profile.portraitImage, cache),
+      swimmingImage: await uploadIfDataUrl(profile.swimmingImage, cache)
+    };
+
+    onProgress?.('Supabase에 저장 중...');
+    await CloudBackend.replaceAll(categories, migratedItems, migratedProfile);
+    return { items: migratedItems.length, images: cache.size };
   }
 };

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Category, PortfolioItem, SiteProfile } from './types/portfolio';
-import { PortfolioStorage } from './services/storage';
+import { PortfolioStorage, DEFAULT_PROFILE } from './services/storage';
+import { supabase } from './lib/supabase';
 import { AppRoute, parseHash, navigateTo } from './utils/router';
 import { Header } from './components/Header';
 import { Footer } from './components/Footer';
@@ -15,7 +16,8 @@ import { AdminModal } from './components/AdminModal';
 export default function App() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [items, setItems] = useState<PortfolioItem[]>([]);
-  const [profile, setProfile] = useState<SiteProfile>(PortfolioStorage.getProfile());
+  const [profile, setProfile] = useState<SiteProfile>(DEFAULT_PROFILE);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   // Multi-Page Routing state from URL hash
@@ -24,9 +26,18 @@ export default function App() {
   );
 
   // Authentication state
+  // - 클라우드(Supabase) 모드: Supabase 로그인 세션으로 판단
+  // - 브라우저 모드: 기존 비밀번호 방식 (세션 동안 유지)
   const [isAdmin, setIsAdmin] = useState<boolean>(() => {
-    return sessionStorage.getItem('jh_is_admin') === 'true';
+    return !supabase && sessionStorage.getItem('jh_is_admin') === 'true';
   });
+
+  useEffect(() => {
+    if (!supabase) return;
+    supabase.auth.getSession().then(({ data }) => setIsAdmin(!!data.session));
+    const { data } = supabase.auth.onAuthStateChange((_event, session) => setIsAdmin(!!session));
+    return () => data.subscription.unsubscribe();
+  }, []);
 
   // Modal Lightbox state (for popup preview)
   const [activeModalItem, setActiveModalItem] = useState<PortfolioItem | null>(null);
@@ -38,13 +49,18 @@ export default function App() {
   // Load data from Storage
   const loadData = async () => {
     try {
-      const [cats, allItems] = await Promise.all([
+      const [cats, allItems, prof] = await Promise.all([
         PortfolioStorage.getCategories(),
-        PortfolioStorage.getItems()
+        PortfolioStorage.getItems(),
+        PortfolioStorage.getProfile()
       ]);
       setCategories(cats);
       setItems(allItems);
-      setProfile(PortfolioStorage.getProfile());
+      setProfile(prof);
+      setLoadError(null);
+    } catch (err) {
+      console.error(err);
+      setLoadError(err instanceof Error ? err.message : '자료를 불러오지 못했습니다.');
     } finally {
       setLoading(false);
     }
@@ -69,12 +85,13 @@ export default function App() {
   // Auth helpers
   const handleLoginSuccess = () => {
     setIsAdmin(true);
-    sessionStorage.setItem('jh_is_admin', 'true');
+    if (!supabase) sessionStorage.setItem('jh_is_admin', 'true');
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     setIsAdmin(false);
     sessionStorage.removeItem('jh_is_admin');
+    if (supabase) await supabase.auth.signOut();
   };
 
   // Card Actions
@@ -113,6 +130,20 @@ export default function App() {
         {loading ? (
           <div className="py-32 text-center text-neutral-500 text-sm">
             포트폴리오 페이지를 불러오는 중입니다...
+          </div>
+        ) : loadError ? (
+          <div className="py-32 px-4 text-center space-y-4">
+            <p className="text-neutral-300 text-sm">자료를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.</p>
+            <p className="text-neutral-500 text-xs break-words">{loadError}</p>
+            <button
+              onClick={() => {
+                setLoading(true);
+                loadData();
+              }}
+              className="cursor-pointer px-4 py-2 text-xs font-semibold rounded-md bg-neutral-800 text-neutral-200 hover:bg-neutral-700"
+            >
+              다시 시도
+            </button>
           </div>
         ) : currentRoute.page === 'home' ? (
           /* Level 1: Main Home Page */
