@@ -77,4 +77,5 @@ export interface SiteProfile {
     sublabel: string;
   }[];
   pillars?: AboutPillar[];
+  template?: string; // 사이트 디자인 템플릿 ID (예: 'classic', 'white')
 }

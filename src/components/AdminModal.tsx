@@ -3,7 +3,7 @@ import {
   X, Lock, Unlock, Plus, Trash2, Edit3, Upload, Film, 
   Image as ImageIcon, Check, RefreshCw, KeyRound, Layers,
   ListPlus, FileText, ArrowLeft, Star, AlertTriangle, Search, Filter, User, Folder, LayoutGrid, List,
-  ChevronUp, ChevronDown
+  ChevronUp, ChevronDown, Palette, ExternalLink
 } from 'lucide-react';
 import { Category, PortfolioItem, StatHighlight, Submenu, MediaType, SiteProfile } from '../types/portfolio';
 import { 
@@ -15,6 +15,8 @@ import {
 } from '../services/storage';
 import { supabase } from '../lib/supabase';
 import { ConfirmDialog } from './ConfirmDialog';
+import { TEMPLATES, DEFAULT_TEMPLATE_ID, buildPreviewUrl } from '../templates/registry';
+import { TemplateId } from '../templates/types';
 
 const errorMessage = (err: unknown, fallback: string) =>
   err instanceof Error && err.message ? err.message : fallback;
@@ -43,7 +45,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
   editingItemInitial
 }) => {
   // Navigation Tabs inside Admin: items | categories | about | settings
-  const [activeTab, setActiveTab] = useState<'items' | 'categories' | 'about' | 'settings'>('items');
+  const [activeTab, setActiveTab] = useState<'items' | 'categories' | 'about' | 'design' | 'settings'>('items');
 
   // Confirmation modal state for destructive delete operations
   const [deleteConfirm, setDeleteConfirm] = useState<{
@@ -162,6 +164,10 @@ export const AdminModal: React.FC<AdminModalProps> = ({
     description: string;
   } | null>(null);
   const [savingMeta, setSavingMeta] = useState(false);
+
+  // Design / template tab
+  const [templateSaving, setTemplateSaving] = useState<TemplateId | null>(null);
+  const [templateFeedback, setTemplateFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [movingCatId, setMovingCatId] = useState<string | null>(null);
 
   // Status messages
@@ -495,6 +501,24 @@ export const AdminModal: React.FC<AdminModalProps> = ({
         await onDataChanged();
       }
     );
+  };
+
+  // Apply a site template (saved with the profile → applies to all visitors)
+  const handleApplyTemplate = async (id: TemplateId) => {
+    setTemplateSaving(id);
+    setTemplateFeedback(null);
+    try {
+      const current = await PortfolioStorage.getProfile();
+      await PortfolioStorage.saveProfile({ ...current, template: id }, current);
+      await onDataChanged();
+      await reloadAboutProfile();
+      const name = TEMPLATES.find((t) => t.id === id)?.name || id;
+      setTemplateFeedback({ type: 'success', message: `'${name}' 템플릿이 적용되었습니다. 모든 방문자에게 바로 반영됩니다.` });
+    } catch (err) {
+      setTemplateFeedback({ type: 'error', message: errorMessage(err, '템플릿 적용 중 오류가 발생했습니다.') });
+    } finally {
+      setTemplateSaving(null);
+    }
   };
 
   // Change category display order (menu / home / admin)
@@ -918,6 +942,17 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                 >
                   <User className="w-4 h-4" />
                   <span>Home About 소개 관리</span>
+                </button>
+                <button
+                  onClick={() => setActiveTab('design')}
+                  className={`cursor-pointer flex items-center gap-2 px-4 py-2.5 text-xs font-semibold rounded-t-lg border-b-2 transition-colors ${
+                    activeTab === 'design'
+                      ? 'text-amber-400 border-amber-400 bg-neutral-800/60 font-bold'
+                      : 'text-neutral-400 border-transparent hover:text-white'
+                  }`}
+                >
+                  <Palette className="w-4 h-4" />
+                  <span>디자인 (템플릿)</span>
                 </button>
                 <button
                   onClick={() => setActiveTab('settings')}
@@ -2072,8 +2107,79 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                     </button>
                   </div>
                 </form>
+              ) : activeTab === 'design' ? (
+                /* -------------------- 5. DESIGN / TEMPLATE TAB -------------------- */
+                <div className="space-y-5 max-w-3xl mx-auto">
+                  <div className="pb-3 border-b border-neutral-800">
+                    <h3 className="font-['Outfit'] text-base font-bold text-white">디자인 (템플릿) 선택</h3>
+                    <p className="text-xs text-neutral-400 leading-relaxed">
+                      메뉴 구성, 등록 자료, About 내용은 그대로 유지한 채 사이트의 디자인만 바꿉니다.
+                      [미리보기]로 새 탭에서 먼저 확인한 뒤 [적용하기]를 누르면 모든 방문자에게 바로 반영됩니다.
+                    </p>
+                  </div>
+
+                  {templateFeedback && (
+                    <div
+                      className={`p-3 rounded-lg text-xs font-medium ${
+                        templateFeedback.type === 'success'
+                          ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
+                          : 'bg-red-500/10 text-red-400 border border-red-500/30'
+                      }`}
+                    >
+                      {templateFeedback.message}
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {TEMPLATES.map((t) => {
+                      const currentId = savedProfile.template || DEFAULT_TEMPLATE_ID;
+                      const isCurrent = currentId === t.id;
+                      return (
+                        <div
+                          key={t.id}
+                          className={`p-5 rounded-xl border space-y-3 ${
+                            isCurrent ? 'border-amber-500/60 bg-amber-500/5' : 'border-neutral-800 bg-neutral-950/60'
+                          } ${t.available ? '' : 'opacity-60'}`}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <h4 className="font-bold text-sm text-white">{t.name}</h4>
+                            {isCurrent ? (
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500 text-neutral-950">사용 중</span>
+                            ) : !t.available ? (
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-neutral-800 text-neutral-400">제작 예정</span>
+                            ) : null}
+                          </div>
+                          <p className="text-xs text-neutral-400 leading-relaxed">{t.description}</p>
+                          <div className="flex items-center gap-2 pt-1">
+                            <a
+                              href={t.available ? buildPreviewUrl(t.id) : undefined}
+                              target="_blank"
+                              rel="noreferrer"
+                              aria-disabled={!t.available}
+                              className={`flex items-center gap-1 px-3 py-1.5 text-xs rounded-md border transition-colors ${
+                                t.available
+                                  ? 'cursor-pointer text-neutral-200 border-neutral-700 hover:bg-neutral-800'
+                                  : 'pointer-events-none text-neutral-600 border-neutral-800'
+                              }`}
+                            >
+                              <ExternalLink className="w-3.5 h-3.5" />
+                              <span>미리보기</span>
+                            </a>
+                            <button
+                              onClick={() => handleApplyTemplate(t.id)}
+                              disabled={!t.available || isCurrent || templateSaving !== null}
+                              className="cursor-pointer disabled:cursor-not-allowed disabled:opacity-40 px-3.5 py-1.5 text-xs font-bold rounded-md bg-amber-500 hover:bg-amber-400 text-neutral-950"
+                            >
+                              {templateSaving === t.id ? '적용 중...' : isCurrent ? '적용됨' : '적용하기'}
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
               ) : (
-                /* -------------------- 5. SETTINGS TAB -------------------- */
+                /* -------------------- 6. SETTINGS TAB -------------------- */
                 <div className="space-y-6 max-w-xl mx-auto">
                   {/* Storage mode */}
                   <div
