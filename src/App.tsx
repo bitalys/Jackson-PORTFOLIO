@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { Category, PortfolioItem, SiteProfile } from './types/portfolio';
 import { PortfolioStorage, DEFAULT_PROFILE } from './services/storage';
 import { supabase } from './lib/supabase';
@@ -114,6 +114,7 @@ export default function App() {
 
   return (
     <>
+      <Suspense fallback={<div style={{ padding: '160px 20px', textAlign: 'center', opacity: 0.5 }}>Loading…</div>}>
       <Template
         profile={profile}
         categories={categories}
@@ -130,6 +131,7 @@ export default function App() {
         onEditItem={handleEditItem}
         onDeleteItem={handleDeleteItem}
       />
+      </Suspense>
 
       {/* Template preview banner (shown only with ?template=) */}
       {isPreview && (

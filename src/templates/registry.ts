@@ -1,5 +1,9 @@
+import { lazy } from 'react';
 import { TemplateDefinition, TemplateId } from './types';
 import { ClassicTemplate } from './classic/ClassicTemplate';
+
+// White 템플릿은 선택됐을 때만 내려받습니다 (Classic 방문자 속도에 영향 없음)
+const WhiteTemplate = lazy(() => import('./white/WhiteTemplate'));
 
 /**
  * 템플릿 목록.
@@ -17,9 +21,10 @@ export const TEMPLATES: TemplateDefinition[] = [
   {
     id: 'white',
     name: 'White (Editorial)',
-    description: '크림색 배경과 남색 섹션, 큰 세리프 제목의 잡지형 디자인. 여정(Journey) 타임라인 포함',
-    available: false,
-    component: ClassicTemplate // 제작 완료 전까지 사용되지 않음
+    description:
+      '크림색 배경과 남색 섹션, 큰 세리프 제목의 잡지형 디자인. 이름에 JOURNEY가 들어간 카테고리는 타임라인으로 표시',
+    available: true,
+    component: WhiteTemplate
   }
 ];
 

@@ -5,7 +5,7 @@ import {
   ListPlus, FileText, ArrowLeft, Star, AlertTriangle, Search, Filter, User, Folder, LayoutGrid, List,
   ChevronUp, ChevronDown, Palette, ExternalLink
 } from 'lucide-react';
-import { Category, PortfolioItem, StatHighlight, Submenu, MediaType, SiteProfile } from '../types/portfolio';
+import { Category, PortfolioItem, StatHighlight, Submenu, MediaType, SiteProfile, WhiteTemplateContent } from '../types/portfolio';
 import { 
   PortfolioStorage,
   extractYouTubeId,
@@ -633,7 +633,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
     });
   };
 
-  const handleUpdateAboutPillar = (index: number, field: 'title' | 'description', val: string) => {
+  const handleUpdateAboutPillar = (index: number, field: 'title' | 'description' | 'tags', val: string) => {
     setAboutProfile((prev) => {
       const updated = prev.pillars ? [...prev.pillars] : [
         { id: 'p1', title: 'Tournament Golf', description: '' },
@@ -647,6 +647,9 @@ export const AdminModal: React.FC<AdminModalProps> = ({
       return { ...prev, pillars: updated };
     });
   };
+
+  const updateWhite = (key: keyof WhiteTemplateContent, val: string) =>
+    setAboutProfile((prev) => ({ ...prev, white: { ...(prev.white || {}), [key]: val } }));
 
   const handleSaveAboutProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -2068,6 +2071,13 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                             placeholder="설명"
                             className={adminInputCls}
                           />
+                          <input
+                            type="text"
+                            value={pillar.tags || ''}
+                            onChange={(e) => handleUpdateAboutPillar(idx, 'tags', e.target.value)}
+                            placeholder="태그 (White 템플릿 표시, 예: History · Politics · Writing)"
+                            className={adminInputCls}
+                          />
                         </div>
                       ))}
                     </div>
@@ -2076,6 +2086,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                   {/* Metrics */}
                   <div className="space-y-3 p-4 rounded-xl bg-neutral-950/60 border border-neutral-800">
                     <div className="text-xs font-bold text-amber-400">하단 성과 지표 (4개)</div>
+                    <p className="text-[11px] text-neutral-500">White 템플릿에서는 1번 지표가 홈의 "대표 성과" 큰 숫자로 표시됩니다. (값 = 큰 숫자, 항목명 = 숫자 아래 문구, 보조 설명 = 오른쪽 설명)</p>
                     <div className="space-y-2">
                       {aboutProfile.metrics.map((m, idx) => (
                         <div key={idx} className="grid grid-cols-1 sm:grid-cols-3 gap-2">
@@ -2084,6 +2095,167 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                           <input type="text" value={m.sublabel} onChange={(e) => handleUpdateAboutMetric(idx, 'sublabel', e.target.value)} placeholder="보조 설명" className={adminInputCls} />
                         </div>
                       ))}
+                    </div>
+                  </div>
+
+
+                  {/* White template content */}
+                  <div className="space-y-3 p-4 rounded-xl bg-neutral-950/60 border border-neutral-800">
+                    <div className="text-xs font-bold text-amber-400">White 템플릿 문구</div>
+                    <p className="text-[11px] text-neutral-500 leading-relaxed">
+                      디자인 탭에서 White (Editorial) 템플릿을 사용할 때만 표시되는 문구입니다. 회색 예시는 받은 샘플의 문구이니 참고해서 입력하세요.
+                      제목 칸에서 Enter로 줄을 바꾸면 화면에서도 줄이 바뀝니다. 비워 두면 기존 About 내용이나 기본 문구를 사용합니다.
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <label className="text-xs font-semibold text-neutral-300">홈 첫 화면 큰 제목</label>
+                          <textarea
+                            rows={2}
+                            value={aboutProfile.white?.heroTitle || ''}
+                            onChange={(e) => updateWhite('heroTitle', e.target.value)}
+                            placeholder={"예: Curious about\nthe world."}
+                            className={adminInputCls}
+                          />
+                          <p className="text-[10px] text-neutral-500">비우면 '메인 제목'을 사용</p>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-semibold text-neutral-300">홈 첫 화면 제목 아래 한 줄</label>
+                          <input
+                            type="text"
+                            value={aboutProfile.white?.heroTagline || ''}
+                            onChange={(e) => updateWhite('heroTagline', e.target.value)}
+                            placeholder="예: Student · Athlete · Writer · Explorer"
+                            className={adminInputCls}
+                          />
+                          <p className="text-[10px] text-neutral-500">비우면 '직함'을 사용</p>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-semibold text-neutral-300">홈 첫 화면 버튼 문구</label>
+                          <input
+                            type="text"
+                            value={aboutProfile.white?.heroButton || ''}
+                            onChange={(e) => updateWhite('heroButton', e.target.value)}
+                            placeholder="예: EXPLORE MY JOURNEY"
+                            className={adminInputCls}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-semibold text-neutral-300">01 Who I am 제목 (About 페이지에도 표시)</label>
+                          <textarea
+                            rows={2}
+                            value={aboutProfile.white?.whoTitle || ''}
+                            onChange={(e) => updateWhite('whoTitle', e.target.value)}
+                            placeholder={"예: More than\na student."}
+                            className={adminInputCls}
+                          />
+                          <p className="text-[10px] text-neutral-500">본문은 '소개 문단'과 '바이오 1'을 사용</p>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-semibold text-neutral-300">03 대표 자료 제목</label>
+                          <textarea
+                            rows={2}
+                            value={aboutProfile.white?.storiesTitle || ''}
+                            onChange={(e) => updateWhite('storiesTitle', e.target.value)}
+                            placeholder={"예: Stories that\nshape me."}
+                            className={adminInputCls}
+                          />
+                          <p className="text-[10px] text-neutral-500">Featured로 지정한 자료 3개가 카드로 표시</p>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-semibold text-neutral-300">04 대표 성과 제목</label>
+                          <textarea
+                            rows={2}
+                            value={aboutProfile.white?.achievementTitle || ''}
+                            onChange={(e) => updateWhite('achievementTitle', e.target.value)}
+                            placeholder={"예: A moment\nI will remember."}
+                            className={adminInputCls}
+                          />
+                          <p className="text-[10px] text-neutral-500">큰 숫자는 '성과 지표 1번'</p>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-semibold text-neutral-300">05 분야 둘러보기 제목</label>
+                          <textarea
+                            rows={2}
+                            value={aboutProfile.white?.exploreTitle || ''}
+                            onChange={(e) => updateWhite('exploreTitle', e.target.value)}
+                            placeholder={"예: I learn by\nmaking things."}
+                            className={adminInputCls}
+                          />
+                          <p className="text-[10px] text-neutral-500">아래에 카테고리 목록이 자동 표시</p>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-semibold text-neutral-300">05 분야 둘러보기 설명</label>
+                          <textarea
+                            rows={2}
+                            value={aboutProfile.white?.exploreText || ''}
+                            onChange={(e) => updateWhite('exploreText', e.target.value)}
+                            placeholder={"예: Some of my interests begin with a question, a place or simply something I want to understand better."}
+                            className={adminInputCls}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-semibold text-neutral-300">06 What's next 제목</label>
+                          <textarea
+                            rows={2}
+                            value={aboutProfile.white?.nextTitle || ''}
+                            onChange={(e) => updateWhite('nextTitle', e.target.value)}
+                            placeholder={"예: The next chapter\nis still being written."}
+                            className={adminInputCls}
+                          />
+                          <p className="text-[10px] text-neutral-500">제목과 설명을 모두 비우면 섹션을 숨김</p>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-semibold text-neutral-300">06 What's next 설명</label>
+                          <textarea
+                            rows={3}
+                            value={aboutProfile.white?.nextText || ''}
+                            onChange={(e) => updateWhite('nextText', e.target.value)}
+                            placeholder={"예: As I move toward the IB Diploma Programme and eventually university, ..."}
+                            className={adminInputCls}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-semibold text-neutral-300">하단 큰 문구</label>
+                          <textarea
+                            rows={2}
+                            value={aboutProfile.white?.closingTitle || ''}
+                            onChange={(e) => updateWhite('closingTitle', e.target.value)}
+                            placeholder={"예: KEEP\nEXPLORING."}
+                            className={adminInputCls}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-semibold text-neutral-300">하단 큰 문구 아래 한 줄</label>
+                          <input
+                            type="text"
+                            value={aboutProfile.white?.closingText || ''}
+                            onChange={(e) => updateWhite('closingText', e.target.value)}
+                            placeholder="예: Ask better questions. Go further. Keep learning."
+                            className={adminInputCls}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-semibold text-neutral-300">About 페이지 큰 제목</label>
+                          <textarea
+                            rows={2}
+                            value={aboutProfile.white?.aboutHeroTitle || ''}
+                            onChange={(e) => updateWhite('aboutHeroTitle', e.target.value)}
+                            placeholder={"예: Curiosity is\nwhere it starts."}
+                            className={adminInputCls}
+                          />
+                          <p className="text-[10px] text-neutral-500">비우면 '메인 제목'을 사용</p>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-semibold text-neutral-300">About 페이지 인용문</label>
+                          <textarea
+                            rows={3}
+                            value={aboutProfile.white?.aboutQuote || ''}
+                            onChange={(e) => updateWhite('aboutQuote', e.target.value)}
+                            placeholder={"예: I don't know exactly where these interests will lead me, ..."}
+                            className={adminInputCls}
+                          />
+                          <p className="text-[10px] text-neutral-500">비우면 숨김</p>
+                        </div>
                     </div>
                   </div>
 
