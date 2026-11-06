@@ -2,7 +2,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import { 
   X, Lock, Unlock, Plus, Trash2, Edit3, Upload, Film, 
   Image as ImageIcon, Check, RefreshCw, KeyRound, Layers,
-  ListPlus, FileText, ArrowLeft, Star, AlertTriangle, Search, Filter, User, Folder, LayoutGrid, List
+  ListPlus, FileText, ArrowLeft, Star, AlertTriangle, Search, Filter, User, Folder, LayoutGrid, List,
+  ChevronUp, ChevronDown
 } from 'lucide-react';
 import { Category, PortfolioItem, StatHighlight, Submenu, MediaType, SiteProfile } from '../types/portfolio';
 import { 
@@ -161,6 +162,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
     description: string;
   } | null>(null);
   const [savingMeta, setSavingMeta] = useState(false);
+  const [movingCatId, setMovingCatId] = useState<string | null>(null);
 
   // Status messages
   const [formFeedback, setFormFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
@@ -493,6 +495,19 @@ export const AdminModal: React.FC<AdminModalProps> = ({
         await onDataChanged();
       }
     );
+  };
+
+  // Change category display order (menu / home / admin)
+  const handleMoveCategory = async (catId: string, direction: -1 | 1) => {
+    setMovingCatId(catId);
+    try {
+      await PortfolioStorage.moveCategory(catId, direction);
+      await onDataChanged();
+    } catch (err) {
+      alert(errorMessage(err, '순서 변경 중 오류가 발생했습니다.'));
+    } finally {
+      setMovingCatId(null);
+    }
   };
 
   // Save category name / description
@@ -1581,6 +1596,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                     </h3>
                     <p className="text-xs text-neutral-400">
                       새로운 서브 메뉴(예: ATHLETICS · GOLF, ATHLETICS · Swimming 등)를 자유롭게 추가하거나 삭제할 수 있습니다.
+                      카테고리 왼쪽의 ▲▼ 버튼으로 상단 메뉴에 표시되는 순서를 바꿀 수 있습니다.
                     </p>
                   </div>
 
@@ -1608,7 +1624,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
 
                   {/* List of Categories and their Submenus */}
                   <div className="space-y-4">
-                    {categories.map((cat) => (
+                    {categories.map((cat, catIdx) => (
                       <div
                         key={cat.id}
                         className="p-5 rounded-xl border border-neutral-800 bg-neutral-950/40 space-y-4"
@@ -1662,6 +1678,29 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                           </div>
                         ) : (
                           <div className="flex items-start justify-between gap-3 pb-3 border-b border-neutral-800/80">
+                            <div className="flex items-start gap-3 min-w-0">
+                              {/* Display order controls */}
+                              <div className="flex flex-col items-center shrink-0 pt-0.5">
+                                <button
+                                  onClick={() => handleMoveCategory(cat.id, -1)}
+                                  disabled={catIdx === 0 || movingCatId !== null}
+                                  className="cursor-pointer disabled:cursor-not-allowed disabled:opacity-25 p-0.5 text-neutral-400 hover:text-amber-400 rounded"
+                                  title="위로 이동"
+                                  aria-label={`${cat.label} 위로 이동`}
+                                >
+                                  <ChevronUp className="w-4 h-4" />
+                                </button>
+                                <span className="text-[10px] font-mono text-neutral-500 leading-none">{catIdx + 1}</span>
+                                <button
+                                  onClick={() => handleMoveCategory(cat.id, 1)}
+                                  disabled={catIdx === categories.length - 1 || movingCatId !== null}
+                                  className="cursor-pointer disabled:cursor-not-allowed disabled:opacity-25 p-0.5 text-neutral-400 hover:text-amber-400 rounded"
+                                  title="아래로 이동"
+                                  aria-label={`${cat.label} 아래로 이동`}
+                                >
+                                  <ChevronDown className="w-4 h-4" />
+                                </button>
+                              </div>
                             <div className="min-w-0">
                               <div className="flex items-center gap-2">
                                 <h4 className="font-['Outfit'] text-base font-extrabold text-amber-400 tracking-wide">
@@ -1674,6 +1713,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                               <p className={`text-xs mt-0.5 ${cat.description ? 'text-neutral-400' : 'text-neutral-600 italic'}`}>
                                 {cat.description || '설명 없음'}
                               </p>
+                            </div>
                             </div>
 
                             <div className="flex items-center gap-1 shrink-0">

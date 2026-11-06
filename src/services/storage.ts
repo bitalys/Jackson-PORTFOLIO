@@ -893,6 +893,17 @@ export const PortfolioStorage = {
     return newSub;
   },
 
+  /** 카테고리 표시 순서 변경: direction -1 = 위로, +1 = 아래로 */
+  async moveCategory(categoryId: string, direction: -1 | 1): Promise<boolean> {
+    const categories = await backend().getCategories();
+    const idx = categories.findIndex((c) => c.id === categoryId);
+    const target = idx + direction;
+    if (idx === -1 || target < 0 || target >= categories.length) return false;
+    [categories[idx], categories[target]] = [categories[target], categories[idx]];
+    await backend().saveCategories(categories);
+    return true;
+  },
+
   /** 카테고리 이름·설명 수정 (ID는 URL과 자료 연결에 쓰이므로 변경하지 않음) */
   async updateCategory(categoryId: string, updates: { label?: string; description?: string }): Promise<boolean> {
     const categories = await backend().getCategories();
