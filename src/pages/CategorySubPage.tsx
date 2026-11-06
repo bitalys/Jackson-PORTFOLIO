@@ -112,7 +112,8 @@ export const CategorySubPage: React.FC<CategorySubPageProps> = ({
           </h1>
 
           <p className="text-sm sm:text-base text-neutral-300 leading-relaxed">
-            {currentCategory?.description ||
+            {currentSubmenu?.description ||
+              currentCategory?.description ||
               `Competition videos, results, research and activities in ${currentCategory?.label}.`}
           </p>
 

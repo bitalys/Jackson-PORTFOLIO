@@ -152,6 +152,16 @@ export const AdminModal: React.FC<AdminModalProps> = ({
   const [newSubmenuCategoryId, setNewSubmenuCategoryId] = useState('');
   const [newCategoryLabel, setNewCategoryLabel] = useState('');
 
+  // Inline editing for category / submenu name & description
+  const [editingCat, setEditingCat] = useState<{ id: string; label: string; description: string } | null>(null);
+  const [editingSub, setEditingSub] = useState<{
+    catId: string;
+    subId: string;
+    name: string;
+    description: string;
+  } | null>(null);
+  const [savingMeta, setSavingMeta] = useState(false);
+
   // Status messages
   const [formFeedback, setFormFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [uploadingCount, setUploadingCount] = useState(0);
@@ -483,6 +493,42 @@ export const AdminModal: React.FC<AdminModalProps> = ({
         await onDataChanged();
       }
     );
+  };
+
+  // Save category name / description
+  const handleSaveCategoryEdit = async () => {
+    if (!editingCat) return;
+    setSavingMeta(true);
+    try {
+      await PortfolioStorage.updateCategory(editingCat.id, {
+        label: editingCat.label,
+        description: editingCat.description
+      });
+      await onDataChanged();
+      setEditingCat(null);
+    } catch (err) {
+      alert(errorMessage(err, '카테고리 저장 중 오류가 발생했습니다.'));
+    } finally {
+      setSavingMeta(false);
+    }
+  };
+
+  // Save submenu name / description
+  const handleSaveSubmenuEdit = async () => {
+    if (!editingSub) return;
+    setSavingMeta(true);
+    try {
+      await PortfolioStorage.updateSubmenu(editingSub.catId, editingSub.subId, {
+        name: editingSub.name,
+        description: editingSub.description
+      });
+      await onDataChanged();
+      setEditingSub(null);
+    } catch (err) {
+      alert(errorMessage(err, '서브메뉴 저장 중 오류가 발생했습니다.'));
+    } finally {
+      setSavingMeta(false);
+    }
   };
 
   // Create Top Category
@@ -1567,31 +1613,93 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                         key={cat.id}
                         className="p-5 rounded-xl border border-neutral-800 bg-neutral-950/40 space-y-4"
                       >
-                        <div className="flex items-center justify-between pb-3 border-b border-neutral-800/80">
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <h4 className="font-['Outfit'] text-base font-extrabold text-amber-400 tracking-wide">
-                                {cat.label}
-                              </h4>
-                              <span className="text-xs text-neutral-400 font-mono">
-                                (ID: {cat.id})
-                              </span>
+                        {editingCat?.id === cat.id ? (
+                          <div className="pb-3 border-b border-neutral-800/80 space-y-2.5">
+                            <div className="flex items-center gap-2 text-xs text-neutral-400">
+                              <Edit3 className="w-3.5 h-3.5 text-amber-400" />
+                              <span>카테고리 편집</span>
+                              <span className="font-mono">(ID: {cat.id} · 변경 불가)</span>
                             </div>
-                            {cat.description && (
-                              <p className="text-xs text-neutral-400 mt-0.5">{cat.description}</p>
-                            )}
+                            <div className="space-y-1">
+                              <label className="text-[11px] font-semibold text-neutral-300">카테고리 이름 (메뉴에 표시)</label>
+                              <input
+                                type="text"
+                                value={editingCat.label}
+                                onChange={(e) => setEditingCat({ ...editingCat, label: e.target.value })}
+                                className={`${adminInputCls} uppercase font-bold`}
+                                maxLength={40}
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-[11px] font-semibold text-neutral-300">
+                                설명 (카테고리 페이지 상단에 표시)
+                              </label>
+                              <textarea
+                                rows={2}
+                                value={editingCat.description}
+                                onChange={(e) => setEditingCat({ ...editingCat, description: e.target.value })}
+                                placeholder="예: Competitive golf tournament play, swimming championships, and athletic conditioning."
+                                className={adminInputCls}
+                                maxLength={300}
+                              />
+                            </div>
+                            <div className="flex items-center justify-end gap-2">
+                              <button
+                                onClick={() => setEditingCat(null)}
+                                disabled={savingMeta}
+                                className="cursor-pointer px-3 py-1.5 text-xs text-neutral-400 hover:text-white bg-neutral-800 rounded-md"
+                              >
+                                취소
+                              </button>
+                              <button
+                                onClick={handleSaveCategoryEdit}
+                                disabled={savingMeta}
+                                className="cursor-pointer disabled:opacity-60 px-3.5 py-1.5 text-xs font-bold text-neutral-950 bg-amber-500 hover:bg-amber-400 rounded-md"
+                              >
+                                {savingMeta ? '저장 중...' : '저장'}
+                              </button>
+                            </div>
                           </div>
+                        ) : (
+                          <div className="flex items-start justify-between gap-3 pb-3 border-b border-neutral-800/80">
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2">
+                                <h4 className="font-['Outfit'] text-base font-extrabold text-amber-400 tracking-wide">
+                                  {cat.label}
+                                </h4>
+                                <span className="text-xs text-neutral-400 font-mono">
+                                  (ID: {cat.id})
+                                </span>
+                              </div>
+                              <p className={`text-xs mt-0.5 ${cat.description ? 'text-neutral-400' : 'text-neutral-600 italic'}`}>
+                                {cat.description || '설명 없음'}
+                              </p>
+                            </div>
 
-                          {categories.length > 1 && (
-                            <button
-                              onClick={() => handleDeleteCategory(cat.id, cat.label)}
-                              className="cursor-pointer p-1.5 text-neutral-500 hover:text-red-400 rounded transition-colors"
-                              title="카테고리 삭제"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          )}
-                        </div>
+                            <div className="flex items-center gap-1 shrink-0">
+                              <button
+                                onClick={() => {
+                                  setEditingSub(null);
+                                  setEditingCat({ id: cat.id, label: cat.label, description: cat.description || '' });
+                                }}
+                                className="cursor-pointer flex items-center gap-1 px-2 py-1 text-[11px] text-neutral-300 hover:text-white bg-neutral-800 hover:bg-neutral-700 rounded-md transition-colors"
+                                title="카테고리 이름·설명 편집"
+                              >
+                                <Edit3 className="w-3.5 h-3.5 text-amber-400" />
+                                <span>편집</span>
+                              </button>
+                              {categories.length > 1 && (
+                                <button
+                                  onClick={() => handleDeleteCategory(cat.id, cat.label)}
+                                  className="cursor-pointer p-1.5 text-neutral-500 hover:text-red-400 rounded transition-colors"
+                                  title="카테고리 삭제"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        )}
 
                         {/* Submenus under this category */}
                         <div className="space-y-2">
@@ -1605,27 +1713,96 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                                 (i) => i.categoryId === cat.id && i.submenuId === sub.id
                               ).length;
 
+                              const isEditingThis = editingSub?.catId === cat.id && editingSub?.subId === sub.id;
+
+                              if (isEditingThis && editingSub) {
+                                return (
+                                  <div
+                                    key={sub.id}
+                                    className="col-span-full p-3 rounded-lg border border-amber-500/40 bg-neutral-900 space-y-2"
+                                  >
+                                    <div className="text-[11px] text-neutral-400">
+                                      서브메뉴 편집 <span className="font-mono">(ID: {sub.id} · 변경 불가)</span>
+                                    </div>
+                                    <input
+                                      type="text"
+                                      value={editingSub.name}
+                                      onChange={(e) => setEditingSub({ ...editingSub, name: e.target.value })}
+                                      placeholder="서브메뉴 이름"
+                                      className={`${adminInputCls} font-bold`}
+                                      maxLength={40}
+                                    />
+                                    <textarea
+                                      rows={2}
+                                      value={editingSub.description}
+                                      onChange={(e) => setEditingSub({ ...editingSub, description: e.target.value })}
+                                      placeholder="설명 (카테고리 페이지에서 이 서브메뉴를 선택했을 때 상단에 표시)"
+                                      className={adminInputCls}
+                                      maxLength={300}
+                                    />
+                                    <div className="flex items-center justify-end gap-2">
+                                      <button
+                                        onClick={() => setEditingSub(null)}
+                                        disabled={savingMeta}
+                                        className="cursor-pointer px-3 py-1.5 text-xs text-neutral-400 hover:text-white bg-neutral-800 rounded-md"
+                                      >
+                                        취소
+                                      </button>
+                                      <button
+                                        onClick={handleSaveSubmenuEdit}
+                                        disabled={savingMeta}
+                                        className="cursor-pointer disabled:opacity-60 px-3.5 py-1.5 text-xs font-bold text-neutral-950 bg-amber-500 hover:bg-amber-400 rounded-md"
+                                      >
+                                        {savingMeta ? '저장 중...' : '저장'}
+                                      </button>
+                                    </div>
+                                  </div>
+                                );
+                              }
+
                               return (
                                 <div
                                   key={sub.id}
-                                  className="p-2.5 rounded-lg border border-neutral-800 bg-neutral-900/80 flex items-center justify-between gap-2"
+                                  className="p-2.5 rounded-lg border border-neutral-800 bg-neutral-900/80 flex items-start justify-between gap-2"
                                 >
-                                  <div>
+                                  <div className="min-w-0">
                                     <span className="font-bold text-xs text-white block">
                                       {sub.name}
                                     </span>
-                                    <span className="text-[10px] text-neutral-400">
+                                    {sub.description && (
+                                      <span className="text-[10px] text-neutral-400 block line-clamp-2" title={sub.description}>
+                                        {sub.description}
+                                      </span>
+                                    )}
+                                    <span className="text-[10px] text-neutral-500">
                                       연결 자료: {itemCount}개
                                     </span>
                                   </div>
 
-                                  <button
-                                    onClick={() => handleDeleteSubmenu(cat.id, sub.id, sub.name)}
-                                    className="cursor-pointer p-1 text-neutral-500 hover:text-red-400 rounded"
-                                    title="서브메뉴 삭제"
-                                  >
-                                    <Trash2 className="w-3.5 h-3.5" />
-                                  </button>
+                                  <div className="flex items-center shrink-0">
+                                    <button
+                                      onClick={() => {
+                                        setEditingCat(null);
+                                        setEditingSub({
+                                          catId: cat.id,
+                                          subId: sub.id,
+                                          name: sub.name,
+                                          description: sub.description || ''
+                                        });
+                                      }}
+                                      className="cursor-pointer p-1 text-neutral-500 hover:text-amber-400 rounded"
+                                      title="서브메뉴 이름·설명 편집"
+                                    >
+                                      <Edit3 className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button
+                                      onClick={() => handleDeleteSubmenu(cat.id, sub.id, sub.name)}
+                                      className="cursor-pointer p-1 text-neutral-500 hover:text-red-400 rounded"
+                                      title="서브메뉴 삭제"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
                                 </div>
                               );
                             })}

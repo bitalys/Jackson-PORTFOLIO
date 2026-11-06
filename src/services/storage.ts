@@ -690,7 +690,13 @@ const CloudBackend: StorageBackend = {
       description: c.description || '',
       submenus: (subs.data || [])
         .filter((s) => s.category_id === c.id)
-        .map((s) => ({ id: s.id, name: s.name, categoryId: s.category_id, order: s.sort_order }))
+        .map((s) => ({
+          id: s.id,
+          name: s.name,
+          categoryId: s.category_id,
+          description: s.description || '',
+          order: s.sort_order
+        }))
     }));
   },
 
@@ -702,12 +708,30 @@ const CloudBackend: StorageBackend = {
       description: c.description || '',
       sort_order: i
     }));
+    // 서브메뉴 설명은 submenus.description 컬럼이 필요합니다. 설명을 하나도 쓰지 않았다면
+    // 컬럼이 없는 기존 DB에서도 동작하도록 description 필드를 보내지 않습니다.
+    const withSubDescriptions = categories.some((c) => c.submenus.some((s) => (s.description || '').trim()));
     const subRows = categories.flatMap((c) =>
-      c.submenus.map((s, i) => ({ id: s.id, category_id: c.id, name: s.name, sort_order: i }))
+      c.submenus.map((s, i) => ({
+        id: s.id,
+        category_id: c.id,
+        name: s.name,
+        sort_order: i,
+        ...(withSubDescriptions ? { description: s.description || '' } : {})
+      }))
     );
 
     check(await db.from('categories').upsert(catRows), 'Saving categories');
-    if (subRows.length) check(await db.from('submenus').upsert(subRows), 'Saving sub-menus');
+    if (subRows.length) {
+      const res = await db.from('submenus').upsert(subRows);
+      if (res.error && /description/i.test(res.error.message)) {
+        throw new Error(
+          '서브메뉴 설명을 저장하려면 Supabase SQL Editor에서 다음을 한 번 실행해 주세요: ' +
+            "alter table public.submenus add column if not exists description text default '';"
+        );
+      }
+      check(res, 'Saving sub-menus');
+    }
 
     // 목록에서 빠진 서브메뉴 / 카테고리 삭제
     const existingSubs = check(await db.from('submenus').select('id'), 'Checking sub-menus').data || [];
@@ -867,6 +891,40 @@ export const PortfolioStorage = {
     cat.submenus.push(newSub);
     await backend().saveCategories(categories);
     return newSub;
+  },
+
+  /** 카테고리 이름·설명 수정 (ID는 URL과 자료 연결에 쓰이므로 변경하지 않음) */
+  async updateCategory(categoryId: string, updates: { label?: string; description?: string }): Promise<boolean> {
+    const categories = await backend().getCategories();
+    const cat = categories.find((c) => c.id === categoryId);
+    if (!cat) return false;
+    if (updates.label !== undefined) {
+      const label = updates.label.trim().toUpperCase();
+      if (!label) throw new Error('카테고리 이름을 입력해 주세요.');
+      cat.label = label;
+    }
+    if (updates.description !== undefined) cat.description = updates.description.trim();
+    await backend().saveCategories(categories);
+    return true;
+  },
+
+  /** 서브메뉴 이름·설명 수정 (ID는 변경하지 않음) */
+  async updateSubmenu(
+    categoryId: string,
+    submenuId: string,
+    updates: { name?: string; description?: string }
+  ): Promise<boolean> {
+    const categories = await backend().getCategories();
+    const sub = categories.find((c) => c.id === categoryId)?.submenus.find((s) => s.id === submenuId);
+    if (!sub) return false;
+    if (updates.name !== undefined) {
+      const name = updates.name.trim();
+      if (!name) throw new Error('서브메뉴 이름을 입력해 주세요.');
+      sub.name = name;
+    }
+    if (updates.description !== undefined) sub.description = updates.description.trim();
+    await backend().saveCategories(categories);
+    return true;
   },
 
   async deleteSubmenu(categoryId: string, submenuId: string): Promise<boolean> {

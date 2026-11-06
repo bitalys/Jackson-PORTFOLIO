@@ -10,6 +10,7 @@ export interface Submenu {
   id: string;
   name: string; // e.g. "GOLF", "Swimming", "STEM Research"
   categoryId: string; // e.g. "athletics"
+  description?: string; // 서브메뉴 설명 (카테고리 페이지에서 서브메뉴 선택 시 표시)
   order?: number;
 }
 
