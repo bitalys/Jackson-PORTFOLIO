@@ -682,6 +682,24 @@
 }
 
 /* Item detail */
+.tw-zoom {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: zoom-in;
+}
+.tw-zoom .tw-media img {
+  transition: transform 0.5s;
+}
+.tw-zoom:hover .tw-media img {
+  transform: scale(1.03);
+}
+.tw-zoom:focus-visible {
+  outline: 2px solid #111;
+  outline-offset: 4px;
+}
 .tw-cover {
   aspect-ratio: 16 / 9;
 }

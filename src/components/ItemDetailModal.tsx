@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Play, ExternalLink, Calendar, ChevronLeft, ChevronRight, Edit2, Star } from 'lucide-react';
 import { PortfolioItem, Category } from '../types/portfolio';
+import { ImageLightbox } from './ImageLightbox';
 
 interface ItemDetailModalProps {
   item: PortfolioItem | null;
@@ -28,6 +29,12 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
     return 'video';
   });
   const [selectedImageIndex, setSelectedImageIndex] = useState<number>(0);
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+
+  // Close the photo viewer when switching to another item
+  useEffect(() => {
+    setLightboxIndex(null);
+  }, [item?.id]);
 
   // Keyboard navigation & escape listener
   useEffect(() => {
@@ -222,7 +229,14 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
             {/* Image Gallery View */}
             {(activeMediaTab === 'gallery' || !item.youtubeVideoId) && allImages.length > 0 && (
               <div className="space-y-3">
-                <div className="relative max-h-[500px] rounded-xl overflow-hidden bg-neutral-950 border border-neutral-800 flex items-center justify-center">
+                <div
+                  className="relative max-h-[500px] rounded-xl overflow-hidden bg-neutral-950 border border-neutral-800 flex items-center justify-center cursor-zoom-in group"
+                  onClick={() => setLightboxIndex(Math.min(selectedImageIndex, allImages.length - 1))}
+                  title="Click to enlarge"
+                >
+                  <span className="absolute bottom-3 right-3 z-10 px-2.5 py-1 rounded-md bg-neutral-950/80 border border-neutral-700 text-[11px] text-neutral-200 opacity-0 group-hover:opacity-100 transition-opacity">
+                    Click to enlarge
+                  </span>
                   <img
                     src={allImages[selectedImageIndex] || allImages[0]}
                     alt={`${item.title} media ${selectedImageIndex + 1}`}
@@ -243,7 +257,11 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                     {allImages.map((img, idx) => (
                       <button
                         key={idx}
-                        onClick={() => setSelectedImageIndex(idx)}
+                        onClick={() => {
+                          setSelectedImageIndex(idx);
+                          setLightboxIndex(idx);
+                        }}
+                        title="Click to enlarge"
                         className={`cursor-pointer relative w-16 h-16 rounded-lg overflow-hidden border-2 shrink-0 transition-all ${
                           selectedImageIndex === idx
                             ? 'border-amber-400 scale-105'
@@ -336,6 +354,16 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
           </div>
         </div>
       </div>
+      <ImageLightbox
+        images={allImages}
+        index={lightboxIndex}
+        onIndexChange={(i) => {
+          setLightboxIndex(i);
+          setSelectedImageIndex(i);
+        }}
+        onClose={() => setLightboxIndex(null)}
+        title={item.title}
+      />
     </div>
   );
 };

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { TemplateProps } from '../types';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
+import { ImageLightbox } from '../../components/ImageLightbox';
 import { navigateTo } from '../../utils/router';
 import { href, Lines, Media, categoryLabel, youtubeEmbed, AdminTools } from './shared';
 
@@ -10,6 +11,7 @@ interface Props extends TemplateProps {
 
 export const WhiteItem: React.FC<Props> = ({ items, categories, itemId, isAdmin, onEditItem, onDeleteItem }) => {
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const item = items.find((i) => i.id === itemId);
 
   if (!item) {
@@ -29,6 +31,8 @@ export const WhiteItem: React.FC<Props> = ({ items, categories, itemId, isAdmin,
   const category = categories.find((c) => c.id === item.categoryId);
   const embed = item.mediaType !== 'image' ? youtubeEmbed(item) : null;
   const gallery = (item.galleryImages || []).filter((g) => g && g !== item.coverImage);
+  // Photo viewer shows the cover first, then the gallery photos
+  const allPhotos = Array.from(new Set([item.coverImage, ...gallery].filter(Boolean)));
   const related = items.filter((i) => i.categoryId === item.categoryId && i.id !== item.id).slice(0, 3);
   const paragraphs = (item.details || '').split(/\n{2,}|\n/).map((p) => p.trim()).filter(Boolean);
 
@@ -69,7 +73,16 @@ export const WhiteItem: React.FC<Props> = ({ items, categories, itemId, isAdmin,
             />
           </div>
         ) : (
-          item.coverImage && <Media className="tw-reveal tw-cover" src={item.coverImage} alt={item.title} />
+          item.coverImage && (
+            <button
+              type="button"
+              className="tw-zoom"
+              onClick={() => setLightboxIndex(0)}
+              aria-label="Open photo viewer"
+            >
+              <Media className="tw-reveal tw-cover" src={item.coverImage} alt={item.title} />
+            </button>
+          )
         )}
 
         <div className="tw-split" style={{ marginTop: 90 }}>
@@ -117,9 +130,15 @@ export const WhiteItem: React.FC<Props> = ({ items, categories, itemId, isAdmin,
           <p className="tw-label">Gallery</p>
           <div className="tw-gallery">
             {gallery.map((g, i) => (
-              <a key={i} href={g} target="_blank" rel="noreferrer">
+              <button
+                key={i}
+                type="button"
+                className="tw-zoom"
+                onClick={() => setLightboxIndex(Math.max(allPhotos.indexOf(g), 0))}
+                aria-label={`Open photo ${i + 1}`}
+              >
                 <Media src={g} alt={`${item.title} photo ${i + 1}`} />
-              </a>
+              </button>
             ))}
           </div>
         </section>
@@ -139,6 +158,14 @@ export const WhiteItem: React.FC<Props> = ({ items, categories, itemId, isAdmin,
           </div>
         </section>
       )}
+
+      <ImageLightbox
+        images={allPhotos}
+        index={lightboxIndex}
+        onIndexChange={setLightboxIndex}
+        onClose={() => setLightboxIndex(null)}
+        title={item.title}
+      />
 
       <ConfirmDialog
         isOpen={confirmOpen}

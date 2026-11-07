@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { Category, PortfolioItem } from '../types/portfolio';
 import { Breadcrumbs } from '../components/Breadcrumbs';
+import { ImageLightbox } from '../components/ImageLightbox';
 import { navigateTo } from '../utils/router';
 
 interface ItemThirdPageProps {
@@ -34,6 +35,7 @@ export const ItemThirdPage: React.FC<ItemThirdPageProps> = ({
     return 'video';
   });
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState(0);
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [copied, setCopied] = useState(false);
 
   // Sync active media tab when item changes: photo gallery is default for image-focused items
@@ -256,7 +258,7 @@ export const ItemThirdPage: React.FC<ItemThirdPageProps> = ({
           <div className="space-y-4">
             <div
               className="relative max-h-[640px] rounded-2xl overflow-hidden bg-neutral-950 border border-neutral-800 flex items-center justify-center cursor-pointer group"
-              onClick={() => onOpenModal(item)}
+              onClick={() => setLightboxIndex(Math.min(selectedPhotoIndex, allImages.length - 1))}
             >
               <img
                 src={allImages[selectedPhotoIndex] || allImages[0]}
@@ -280,7 +282,11 @@ export const ItemThirdPage: React.FC<ItemThirdPageProps> = ({
                 {allImages.map((img, idx) => (
                   <button
                     key={idx}
-                    onClick={() => setSelectedPhotoIndex(idx)}
+                    onClick={() => {
+                      setSelectedPhotoIndex(idx);
+                      setLightboxIndex(idx);
+                    }}
+                    title="Click to enlarge"
                     className={`cursor-pointer relative w-24 h-24 rounded-xl overflow-hidden border-2 shrink-0 transition-all ${
                       selectedPhotoIndex === idx
                         ? 'border-amber-400 ring-2 ring-amber-400/30 scale-105'
@@ -417,6 +423,16 @@ export const ItemThirdPage: React.FC<ItemThirdPageProps> = ({
           </div>
         </section>
       )}
+      <ImageLightbox
+        images={allImages}
+        index={lightboxIndex}
+        onIndexChange={(i) => {
+          setLightboxIndex(i);
+          setSelectedPhotoIndex(i);
+        }}
+        onClose={() => setLightboxIndex(null)}
+        title={item.title}
+      />
     </div>
   );
 };
