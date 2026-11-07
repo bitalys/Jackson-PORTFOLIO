@@ -6,6 +6,7 @@ import {
 import { Category, PortfolioItem } from '../types/portfolio';
 import { Breadcrumbs } from '../components/Breadcrumbs';
 import { ImageLightbox } from '../components/ImageLightbox';
+import { StageArrows } from '../components/StageArrows';
 import { navigateTo } from '../utils/router';
 
 interface ItemThirdPageProps {
@@ -275,6 +276,11 @@ export const ItemThirdPage: React.FC<ItemThirdPageProps> = ({
               <div className="absolute bottom-4 right-4 px-3 py-1.5 rounded-lg bg-neutral-950/80 border border-neutral-700 text-xs text-neutral-200">
                 Click to enlarge
               </div>
+              <StageArrows
+                count={allImages.length}
+                index={Math.min(selectedPhotoIndex, allImages.length - 1)}
+                onChange={setSelectedPhotoIndex}
+              />
             </div>
 
             {allImages.length > 1 && (
@@ -282,11 +288,10 @@ export const ItemThirdPage: React.FC<ItemThirdPageProps> = ({
                 {allImages.map((img, idx) => (
                   <button
                     key={idx}
-                    onClick={() => {
-                      setSelectedPhotoIndex(idx);
-                      setLightboxIndex(idx);
-                    }}
-                    title="Click to enlarge"
+                    onClick={() => setSelectedPhotoIndex(idx)}
+                    title={`Photo ${idx + 1}`}
+                    aria-label={`Show photo ${idx + 1}`}
+                    aria-current={selectedPhotoIndex === idx}
                     className={`cursor-pointer relative w-24 h-24 rounded-xl overflow-hidden border-2 shrink-0 transition-all ${
                       selectedPhotoIndex === idx
                         ? 'border-amber-400 ring-2 ring-amber-400/30 scale-105'

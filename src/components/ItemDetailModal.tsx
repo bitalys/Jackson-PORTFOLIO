@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Play, ExternalLink, Calendar, ChevronLeft, ChevronRight, Edit2, Star } from 'lucide-react';
 import { PortfolioItem, Category } from '../types/portfolio';
 import { ImageLightbox } from './ImageLightbox';
+import { StageArrows } from './StageArrows';
 
 interface ItemDetailModalProps {
   item: PortfolioItem | null;
@@ -237,6 +238,11 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                   <span className="absolute bottom-3 right-3 z-10 px-2.5 py-1 rounded-md bg-neutral-950/80 border border-neutral-700 text-[11px] text-neutral-200 opacity-0 group-hover:opacity-100 transition-opacity">
                     Click to enlarge
                   </span>
+                  <StageArrows
+                    count={allImages.length}
+                    index={Math.min(selectedImageIndex, allImages.length - 1)}
+                    onChange={setSelectedImageIndex}
+                  />
                   <img
                     src={allImages[selectedImageIndex] || allImages[0]}
                     alt={`${item.title} media ${selectedImageIndex + 1}`}
@@ -257,11 +263,10 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                     {allImages.map((img, idx) => (
                       <button
                         key={idx}
-                        onClick={() => {
-                          setSelectedImageIndex(idx);
-                          setLightboxIndex(idx);
-                        }}
-                        title="Click to enlarge"
+                        onClick={() => setSelectedImageIndex(idx)}
+                        title={`Photo ${idx + 1}`}
+                        aria-label={`Show photo ${idx + 1}`}
+                        aria-current={selectedImageIndex === idx}
                         className={`cursor-pointer relative w-16 h-16 rounded-lg overflow-hidden border-2 shrink-0 transition-all ${
                           selectedImageIndex === idx
                             ? 'border-amber-400 scale-105'

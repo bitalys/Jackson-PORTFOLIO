@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { TemplateProps } from '../types';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { ImageLightbox } from '../../components/ImageLightbox';
+import { StageArrows } from '../../components/StageArrows';
 import { navigateTo } from '../../utils/router';
 import { href, Lines, categoryLabel, youtubeEmbed, AdminTools } from './shared';
 
@@ -125,15 +126,18 @@ export const WhiteItem: React.FC<Props> = ({ items, categories, itemId, isAdmin,
           </div>
         ) : allPhotos.length > 0 ? (
           <div className="tw-reveal">
-            <button
-              type="button"
-              className="tw-zoom tw-photo-stage"
-              onClick={() => setLightboxIndex(current)}
-              aria-label="Open photo viewer"
-            >
-              <img src={allPhotos[current]} alt={`${item.title} photo ${current + 1}`} referrerPolicy="no-referrer" />
-              <span className="tw-photo-hint">Click to enlarge</span>
-            </button>
+            <div className="tw-photo-stage">
+              <button
+                type="button"
+                className="tw-zoom tw-photo-open"
+                onClick={() => setLightboxIndex(current)}
+                aria-label="Open photo viewer"
+              >
+                <img src={allPhotos[current]} alt={`${item.title} photo ${current + 1}`} referrerPolicy="no-referrer" />
+                <span className="tw-photo-hint">Click to enlarge</span>
+              </button>
+              <StageArrows count={allPhotos.length} index={current} onChange={setSelectedPhotoIndex} tone="light" />
+            </div>
             {allPhotos.length > 1 && (
               <div className="tw-thumbs">
                 {allPhotos.map((src, i) => (
@@ -141,12 +145,10 @@ export const WhiteItem: React.FC<Props> = ({ items, categories, itemId, isAdmin,
                     key={`${src}-${i}`}
                     type="button"
                     className={i === current ? 'active' : ''}
-                    onClick={() => {
-                      setSelectedPhotoIndex(i);
-                      setLightboxIndex(i);
-                    }}
-                    aria-label={`Open photo ${i + 1}`}
-                    title="Click to enlarge"
+                    onClick={() => setSelectedPhotoIndex(i)}
+                    aria-label={`Show photo ${i + 1}`}
+                    aria-current={i === current}
+                    title={`Photo ${i + 1}`}
                   >
                     <img src={src} alt="" referrerPolicy="no-referrer" />
                   </button>
