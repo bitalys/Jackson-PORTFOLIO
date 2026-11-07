@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { TemplateProps } from '../types';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { ImageLightbox } from '../../components/ImageLightbox';
 import { navigateTo } from '../../utils/router';
-import { href, Lines, Media, categoryLabel, youtubeEmbed, AdminTools } from './shared';
+import { href, Lines, categoryLabel, youtubeEmbed, AdminTools } from './shared';
 
 interface Props extends TemplateProps {
   itemId: string;
@@ -13,6 +13,19 @@ export const WhiteItem: React.FC<Props> = ({ items, categories, itemId, isAdmin,
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const item = items.find((i) => i.id === itemId);
+
+  // Same rule as the Classic template: photo-focused items (or items without a video) open on the gallery
+  const defaultTab = (): 'video' | 'gallery' =>
+    !item || item.mediaType === 'image' || !item.youtubeVideoId ? 'gallery' : 'video';
+  const [activeMediaTab, setActiveMediaTab] = useState<'video' | 'gallery'>(defaultTab);
+  const [selectedPhotoIndex, setSelectedPhotoIndex] = useState(0);
+
+  useEffect(() => {
+    setActiveMediaTab(defaultTab());
+    setSelectedPhotoIndex(0);
+    setLightboxIndex(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [item?.id, item?.mediaType, item?.youtubeVideoId]);
 
   if (!item) {
     return (
@@ -29,10 +42,12 @@ export const WhiteItem: React.FC<Props> = ({ items, categories, itemId, isAdmin,
   }
 
   const category = categories.find((c) => c.id === item.categoryId);
-  const embed = item.mediaType !== 'image' ? youtubeEmbed(item) : null;
-  const gallery = (item.galleryImages || []).filter((g) => g && g !== item.coverImage);
-  // Photo viewer shows the cover first, then the gallery photos
-  const allPhotos = Array.from(new Set([item.coverImage, ...gallery].filter(Boolean)));
+  const embed = youtubeEmbed(item);
+  // All photos including the cover (same as Classic): cover first, then the gallery photos
+  const allPhotos = Array.from(new Set([item.coverImage, ...(item.galleryImages || [])].filter(Boolean)));
+  const showTabs = !!embed && allPhotos.length > 0;
+  const showVideo = !!embed && (activeMediaTab === 'video' || allPhotos.length === 0);
+  const current = Math.min(selectedPhotoIndex, Math.max(allPhotos.length - 1, 0));
   const related = items.filter((i) => i.categoryId === item.categoryId && i.id !== item.id).slice(0, 3);
   const paragraphs = (item.details || '').split(/\n{2,}|\n/).map((p) => p.trim()).filter(Boolean);
 
@@ -62,28 +77,84 @@ export const WhiteItem: React.FC<Props> = ({ items, categories, itemId, isAdmin,
       </section>
 
       <section className="tw-section">
-        {embed ? (
-          <div className="tw-video tw-reveal">
-            <iframe
-              src={embed}
-              title={item.title}
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-              referrerPolicy="strict-origin-when-cross-origin"
-              allowFullScreen
-            />
-          </div>
-        ) : (
-          item.coverImage && (
+        {/* Media: Official Video / Photo Gallery tabs (same structure as Classic) */}
+        {showTabs && (
+          <div className="tw-media-tabs" role="tablist">
             <button
               type="button"
-              className="tw-zoom"
-              onClick={() => setLightboxIndex(0)}
+              role="tab"
+              aria-selected={activeMediaTab === 'video'}
+              className={activeMediaTab === 'video' ? 'active' : ''}
+              onClick={() => setActiveMediaTab('video')}
+            >
+              ▶ Official Video
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeMediaTab === 'gallery'}
+              className={activeMediaTab === 'gallery' ? 'active' : ''}
+              onClick={() => setActiveMediaTab('gallery')}
+            >
+              Photo Gallery ({allPhotos.length})
+            </button>
+          </div>
+        )}
+
+        {showVideo ? (
+          <div className="tw-reveal">
+            <div className="tw-video">
+              <iframe
+                src={embed!}
+                title={item.title}
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                referrerPolicy="strict-origin-when-cross-origin"
+                allowFullScreen
+              />
+            </div>
+            <div className="tw-media-note">
+              <span>Video not playing due to browser or third-party restrictions?</span>
+              <a
+                href={item.youtubeUrl || `https://www.youtube.com/watch?v=${item.youtubeVideoId}`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Watch on YouTube ↗
+              </a>
+            </div>
+          </div>
+        ) : allPhotos.length > 0 ? (
+          <div className="tw-reveal">
+            <button
+              type="button"
+              className="tw-zoom tw-photo-stage"
+              onClick={() => setLightboxIndex(current)}
               aria-label="Open photo viewer"
             >
-              <Media className="tw-reveal tw-cover" src={item.coverImage} alt={item.title} />
+              <img src={allPhotos[current]} alt={`${item.title} photo ${current + 1}`} referrerPolicy="no-referrer" />
+              <span className="tw-photo-hint">Click to enlarge</span>
             </button>
-          )
-        )}
+            {allPhotos.length > 1 && (
+              <div className="tw-thumbs">
+                {allPhotos.map((src, i) => (
+                  <button
+                    key={`${src}-${i}`}
+                    type="button"
+                    className={i === current ? 'active' : ''}
+                    onClick={() => {
+                      setSelectedPhotoIndex(i);
+                      setLightboxIndex(i);
+                    }}
+                    aria-label={`Open photo ${i + 1}`}
+                    title="Click to enlarge"
+                  >
+                    <img src={src} alt="" referrerPolicy="no-referrer" />
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : null}
 
         <div className="tw-split" style={{ marginTop: 90 }}>
           <div>
@@ -110,39 +181,10 @@ export const WhiteItem: React.FC<Props> = ({ items, categories, itemId, isAdmin,
                   {item.externalLinkLabel || 'Official link'} <span>↗</span>
                 </a>
               )}
-              {item.youtubeVideoId && (
-                <a
-                  className="tw-button"
-                  href={`https://www.youtube.com/watch?v=${item.youtubeVideoId}`}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  Watch on YouTube <span>↗</span>
-                </a>
-              )}
             </div>
           </div>
         </div>
       </section>
-
-      {gallery.length > 0 && (
-        <section className="tw-section" style={{ paddingTop: 0 }}>
-          <p className="tw-label">Gallery</p>
-          <div className="tw-gallery">
-            {gallery.map((g, i) => (
-              <button
-                key={i}
-                type="button"
-                className="tw-zoom"
-                onClick={() => setLightboxIndex(Math.max(allPhotos.indexOf(g), 0))}
-                aria-label={`Open photo ${i + 1}`}
-              >
-                <Media src={g} alt={`${item.title} photo ${i + 1}`} />
-              </button>
-            ))}
-          </div>
-        </section>
-      )}
 
       {related.length > 0 && (
         <section className="tw-section" style={{ paddingTop: 0 }}>
@@ -162,7 +204,10 @@ export const WhiteItem: React.FC<Props> = ({ items, categories, itemId, isAdmin,
       <ImageLightbox
         images={allPhotos}
         index={lightboxIndex}
-        onIndexChange={setLightboxIndex}
+        onIndexChange={(i) => {
+          setLightboxIndex(i);
+          setSelectedPhotoIndex(i);
+        }}
         onClose={() => setLightboxIndex(null)}
         title={item.title}
       />
