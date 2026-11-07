@@ -167,25 +167,30 @@ export const WhiteItem: React.FC<Props> = ({ items, categories, itemId, isAdmin,
             {paragraphs.map((p, i) => (
               <p key={i}>{p}</p>
             ))}
-            {item.highlights && item.highlights.length > 0 && (
-              <div className="tw-stats">
-                {item.highlights.map((h) => (
-                  <div key={h.id}>
-                    <b>{h.value}</b>
-                    <span>{h.label}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-            <div className="tw-meta-row">
-              {item.externalLink && (
+            {item.externalLink && (
+              <div className="tw-meta-row">
                 <a className="tw-button" href={item.externalLink} target="_blank" rel="noreferrer">
                   {item.externalLinkLabel || 'Official link'} <span>↗</span>
                 </a>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         </div>
+
+        {/* Key results: full width below the summary and the story */}
+        {item.highlights && item.highlights.length > 0 && (
+          <div className="tw-results">
+            <p className="tw-label">Key results</p>
+            <div className="tw-results-grid">
+              {item.highlights.map((h) => (
+                <div key={h.id}>
+                  <b>{h.value}</b>
+                  <span>{h.label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </section>
 
       {related.length > 0 && (

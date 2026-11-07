@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import './white.css';
 import { TemplateProps } from '../types';
-import { href, initials, Lines } from './shared';
+import { href, Lines } from './shared';
 import { WhiteHome } from './WhiteHome';
 import { WhiteCategory } from './WhiteCategory';
 import { WhiteItem } from './WhiteItem';
@@ -112,9 +112,8 @@ export const WhiteTemplate: React.FC<TemplateProps> = (props) => {
       <div className="tw-progress" ref={progressRef} />
 
       <header className="tw-header">
-        <a className="tw-brand" href={href({ page: 'home' })} aria-label="Home">
-          {initials(profile.name)}
-          <span>.</span>
+        <a className="tw-brand" href={href({ page: 'home' })} aria-label={`${profile.name} — Home`}>
+          {profile.name || 'Jackson Hong'}
         </a>
         <button
           className="tw-menu-toggle"
