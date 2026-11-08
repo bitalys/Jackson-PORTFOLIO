@@ -4,6 +4,8 @@ import { PortfolioStorage, DEFAULT_PROFILE } from './services/storage';
 import { supabase } from './lib/supabase';
 import { AppRoute, parseHash, navigateTo } from './utils/router';
 import { AdminModal } from './components/AdminModal';
+import { LockScreen } from './components/LockScreen';
+import { SiteLock } from './services/siteLock';
 import { resolveTemplate, getPreviewTemplateId, exitPreviewUrl } from './templates/registry';
 
 /**
@@ -62,9 +64,47 @@ export default function App() {
     }
   };
 
+  // Private Access (visitor passcode lock)
+  // checking → locked (show lock screen) | open (load and show the site)
+  const [access, setAccess] = useState<'checking' | 'locked' | 'open'>('checking');
+  const [lockTitle, setLockTitle] = useState<string | undefined>();
+
   useEffect(() => {
-    loadData();
+    let cancelled = false;
+    (async () => {
+      try {
+        // A logged-in admin can always see the site
+        const admin = supabase
+          ? !!(await supabase.auth.getSession()).data.session
+          : sessionStorage.getItem('jh_is_admin') === 'true';
+        if (admin) return !cancelled && setAccess('open');
+
+        const status = await SiteLock.getStatus();
+        if (cancelled) return;
+        setLockTitle(status.title);
+        if (!status.locked) return setAccess('open');
+
+        // Passcode remembered on this device and still valid?
+        const ok = await SiteLock.checkStored();
+        if (!cancelled) setAccess(ok ? 'open' : 'locked');
+      } catch {
+        // If the lock status can't be read, don't lock people out of a public site
+        if (!cancelled) setAccess('open');
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
+
+  // Admin logged in from the lock screen → open the site
+  useEffect(() => {
+    if (isAdmin && access === 'locked') setAccess('open');
+  }, [isAdmin, access]);
+
+  useEffect(() => {
+    if (access === 'open') loadData();
+  }, [access]);
 
   // Listen for browser Back/Forward or hash changes
   useEffect(() => {
@@ -137,6 +177,44 @@ export default function App() {
   const Template = template.component;
   const isPreview = getPreviewTemplateId() !== null;
 
+  const adminModal = (
+    <AdminModal
+      isOpen={adminModalOpen}
+      onClose={() => {
+        setAdminModalOpen(false);
+        setEditingItemInitial(null);
+      }}
+      isAdmin={isAdmin}
+      onLoginSuccess={handleLoginSuccess}
+      onLogout={handleLogout}
+      categories={categories}
+      items={items}
+      onDataChanged={loadData}
+      editingItemInitial={editingItemInitial}
+    />
+  );
+
+  if (access !== 'open') {
+    return (
+      <>
+        {access === 'locked' ? (
+          <LockScreen
+            title={lockTitle || profile.name}
+            onUnlock={async (code) => {
+              const ok = await SiteLock.unlock(code);
+              if (ok) setAccess('open');
+              return ok;
+            }}
+            onOpenAdmin={openAdmin}
+          />
+        ) : (
+          <div style={{ minHeight: '100vh', background: '#0b1622' }} aria-busy="true" />
+        )}
+        {adminModal}
+      </>
+    );
+  }
+
   return (
     <>
       <Suspense fallback={<div style={{ padding: '160px 20px', textAlign: 'center', opacity: 0.5 }}>Loading…</div>}>
@@ -171,20 +249,7 @@ export default function App() {
       )}
 
       {/* Admin Management Modal (shared by all templates) */}
-      <AdminModal
-        isOpen={adminModalOpen}
-        onClose={() => {
-          setAdminModalOpen(false);
-          setEditingItemInitial(null);
-        }}
-        isAdmin={isAdmin}
-        onLoginSuccess={handleLoginSuccess}
-        onLogout={handleLogout}
-        categories={categories}
-        items={items}
-        onDataChanged={loadData}
-        editingItemInitial={editingItemInitial}
-      />
+      {adminModal}
     </>
   );
 }

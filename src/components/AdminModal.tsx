@@ -3,7 +3,7 @@ import {
   X, Lock, Unlock, Plus, Trash2, Edit3, Upload, Film, 
   Image as ImageIcon, Check, RefreshCw, KeyRound, Layers,
   ListPlus, FileText, ArrowLeft, Star, AlertTriangle, Search, Filter, User, Folder, LayoutGrid, List,
-  ChevronUp, ChevronDown, Palette, ExternalLink
+  ChevronUp, ChevronDown, Palette, ExternalLink, Globe, ShieldCheck
 } from 'lucide-react';
 import { Category, PortfolioItem, StatHighlight, Submenu, MediaType, SiteProfile, WhiteTemplateContent } from '../types/portfolio';
 import { 
@@ -15,6 +15,7 @@ import {
 } from '../services/storage';
 import { supabase } from '../lib/supabase';
 import { ConfirmDialog } from './ConfirmDialog';
+import { SiteLock, AdminLockStatus } from '../services/siteLock';
 import { TEMPLATES, DEFAULT_TEMPLATE_ID, buildPreviewUrl } from '../templates/registry';
 import { TemplateId } from '../templates/types';
 
@@ -169,6 +170,50 @@ export const AdminModal: React.FC<AdminModalProps> = ({
   const [templateSaving, setTemplateSaving] = useState<TemplateId | null>(null);
   const [templateFeedback, setTemplateFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [movingCatId, setMovingCatId] = useState<string | null>(null);
+
+  // Private Access (visitor passcode lock)
+  const [lockStatus, setLockStatus] = useState<AdminLockStatus | null>(null);
+  const [lockBusy, setLockBusy] = useState(false);
+  const [newSitePasscode, setNewSitePasscode] = useState('');
+  const [lockFeedback, setLockFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  const refreshLockStatus = React.useCallback(async () => {
+    try {
+      setLockStatus(await SiteLock.adminStatus());
+    } catch (err) {
+      setLockFeedback({ type: 'error', message: errorMessage(err, '잠금 설정을 불러오지 못했습니다.') });
+    }
+  }, []);
+
+  useEffect(() => {
+    if (isOpen && isAdmin && activeTab === 'settings') refreshLockStatus();
+  }, [isOpen, isAdmin, activeTab, refreshLockStatus]);
+
+  const applyLock = async (enabled: boolean, newCode?: string) => {
+    setLockBusy(true);
+    setLockFeedback(null);
+    const wasLocked = !!lockStatus?.locked;
+    try {
+      await SiteLock.adminSet(enabled, newCode);
+      await refreshLockStatus();
+      setNewSitePasscode('');
+      let message: string;
+      if (enabled && !wasLocked) {
+        message = '비밀번호 보호가 켜졌습니다. 방문자는 비밀번호를 입력해야 사이트를 볼 수 있습니다.';
+      } else if (!enabled && wasLocked) {
+        message = '전체 공개로 바뀌었습니다. 누구나 링크로 사이트를 볼 수 있습니다.';
+      } else if (enabled) {
+        message = '방문자 비밀번호가 변경되었습니다. 이전 비밀번호로 접속하던 기기는 새 비밀번호를 다시 입력해야 합니다.';
+      } else {
+        message = '방문자 비밀번호가 저장되었습니다. [비밀번호 보호]를 누르면 잠금이 켜집니다.';
+      }
+      setLockFeedback({ type: 'success', message });
+    } catch (err) {
+      setLockFeedback({ type: 'error', message: errorMessage(err, '잠금 설정 변경 중 오류가 발생했습니다.') });
+    } finally {
+      setLockBusy(false);
+    }
+  };
 
   // Status messages
   const [formFeedback, setFormFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
@@ -2400,11 +2445,115 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                     )}
                   </div>
 
+                  {/* Private Access: public / passcode-protected */}
+                  <div className="p-6 rounded-xl border border-neutral-800 bg-neutral-950/60 space-y-4">
+                    <div className="flex items-center gap-2 text-sm font-bold text-white">
+                      <ShieldCheck className="w-4 h-4 text-amber-400" />
+                      <span>사이트 공개 설정 (방문자 비밀번호)</span>
+                    </div>
+                    <p className="text-xs text-neutral-400 leading-relaxed">
+                      비밀번호 보호를 켜면 방문자는 잠금 화면에서 비밀번호를 입력해야 사이트를 볼 수 있습니다. 한 번 입력한 기기는 다시 묻지 않습니다.
+                      로그인한 관리자는 항상 볼 수 있습니다. 검색엔진(구글/네이버)에는 공개 여부와 상관없이 노출되지 않습니다.
+                    </p>
+
+                    {lockStatus && !lockStatus.supported ? (
+                      <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-xs text-amber-200 leading-relaxed">
+                        이 기능을 쓰려면 Supabase SQL Editor에서 저장소의 <code className="font-mono">supabase/site-lock.sql</code> 내용을 한 번 실행해 주세요.
+                        실행 전까지 사이트는 전체 공개로 동작합니다.
+                      </div>
+                    ) : (
+                      <>
+                        <div className="grid grid-cols-2 gap-2">
+                          <button
+                            type="button"
+                            disabled={lockBusy || !lockStatus || !lockStatus.locked}
+                            onClick={() => applyLock(false)}
+                            className={`cursor-pointer disabled:cursor-default flex items-center justify-center gap-2 py-3 rounded-lg border text-xs font-bold transition-colors ${
+                              lockStatus && !lockStatus.locked
+                                ? 'bg-emerald-500/15 border-emerald-500/50 text-emerald-300'
+                                : 'bg-neutral-900 border-neutral-700 text-neutral-400 hover:text-white'
+                            }`}
+                          >
+                            <Globe className="w-4 h-4" />
+                            <span>전체 공개{lockStatus && !lockStatus.locked ? ' (사용 중)' : ''}</span>
+                          </button>
+                          <button
+                            type="button"
+                            disabled={lockBusy || !lockStatus || lockStatus.locked}
+                            onClick={() => {
+                              if (lockStatus && !lockStatus.hasPasscode && !newSitePasscode.trim()) {
+                                setLockFeedback({ type: 'error', message: '아래에 방문자 비밀번호를 먼저 입력해 주세요.' });
+                                return;
+                              }
+                              applyLock(true, newSitePasscode.trim() || undefined);
+                            }}
+                            className={`cursor-pointer disabled:cursor-default flex items-center justify-center gap-2 py-3 rounded-lg border text-xs font-bold transition-colors ${
+                              lockStatus?.locked
+                                ? 'bg-amber-500/15 border-amber-500/50 text-amber-300'
+                                : 'bg-neutral-900 border-neutral-700 text-neutral-400 hover:text-white'
+                            }`}
+                          >
+                            <Lock className="w-4 h-4" />
+                            <span>비밀번호 보호{lockStatus?.locked ? ' (사용 중)' : ''}</span>
+                          </button>
+                        </div>
+
+                        <form
+                          onSubmit={(e) => {
+                            e.preventDefault();
+                            if (!newSitePasscode.trim()) return;
+                            applyLock(!!lockStatus?.locked, newSitePasscode);
+                          }}
+                          className="space-y-2"
+                        >
+                          <label className="text-xs font-semibold text-neutral-300 block">
+                            방문자 비밀번호 {lockStatus?.hasPasscode ? '변경' : '설정'}
+                            <span className="ml-2 font-normal text-neutral-500">
+                              {lockStatus ? (lockStatus.hasPasscode ? '(설정됨)' : '(아직 없음)') : ''}
+                            </span>
+                          </label>
+                          <div className="flex gap-2">
+                            <input
+                              type="text"
+                              value={newSitePasscode}
+                              onChange={(e) => setNewSitePasscode(e.target.value)}
+                              placeholder="새 방문자 비밀번호 (4자 이상, 6자 이상 권장)"
+                              autoComplete="off"
+                              className="flex-1 bg-neutral-900 border border-neutral-700 rounded-lg px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-amber-400 font-mono"
+                            />
+                            <button
+                              type="submit"
+                              disabled={lockBusy || newSitePasscode.trim().length < 4}
+                              className="cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed px-4 py-2 bg-neutral-800 hover:bg-neutral-700 text-white font-semibold text-xs rounded-lg transition-colors border border-neutral-700 whitespace-nowrap"
+                            >
+                              {lockBusy ? '저장 중...' : '비밀번호 저장'}
+                            </button>
+                          </div>
+                          <p className="text-[11px] text-neutral-500">
+                            비밀번호는 암호화되어 저장되므로 저장 후에는 다시 볼 수 없습니다. 바꾸면 기존 방문자 기기는 새 비밀번호를 다시 입력해야 합니다.
+                          </p>
+                        </form>
+
+                        {lockStatus && !lockStatus.enforced && (
+                          <p className="text-[11px] text-amber-300/90 leading-relaxed">
+                            현재는 Supabase 없이 이 브라우저에만 저장되는 모드라서, 잠금은 이 브라우저의 화면만 가립니다.
+                          </p>
+                        )}
+                      </>
+                    )}
+
+                    {lockFeedback && (
+                      <p className={`text-xs ${lockFeedback.type === 'success' ? 'text-emerald-400' : 'text-red-400'}`}>
+                        {lockFeedback.message}
+                      </p>
+                    )}
+                  </div>
+
                   {/* Change Password */}
                   <div className="p-6 rounded-xl border border-neutral-800 bg-neutral-950/60 space-y-4">
                     <div className="flex items-center gap-2 text-sm font-bold text-white">
                       <KeyRound className="w-4 h-4 text-amber-400" />
-                      <span>관리자 비밀번호 변경</span>
+                      <span>관리자 비밀번호 변경 (관리자 로그인용)</span>
                     </div>
                     <p className="text-xs text-neutral-400">
                       {PortfolioStorage.isCloud

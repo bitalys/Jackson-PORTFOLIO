@@ -1,0 +1,7 @@
+# Private portfolio: do not crawl or index any page.
+User-agent: *
+Disallow: /
+
+# Naver
+User-agent: Yeti
+Disallow: /
