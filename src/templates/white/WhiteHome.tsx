@@ -76,7 +76,8 @@ export const WhiteHome: React.FC<TemplateProps> = ({ profile, categories, items,
           </h2>
           <div className="tw-story-grid">
             {stories.map((item, i) => {
-              const withImage = i > 0 && !!item.coverImage;
+              // Every card shows its photo (previously the first card was text-only, so the newest item had no thumbnail)
+              const withImage = !!item.coverImage;
               return (
                 <a
                   key={item.id}
