@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { ArrowUp } from 'lucide-react';
 import './white.css';
 import { TemplateProps } from '../types';
 import { href, Lines } from './shared';
@@ -168,9 +169,17 @@ export const WhiteTemplate: React.FC<TemplateProps> = (props) => {
         <span>
           © {new Date().getFullYear()} {profile.name}
         </span>
-        <span style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
+        <span style={{ display: 'flex', gap: 20, flexWrap: 'wrap', alignItems: 'center' }}>
           <span>{profile.title}</span>
           <button onClick={onOpenAdmin}>{isAdmin ? 'Admin Mode' : 'Admin Login'}</button>
+          <button
+            className="tw-top-button"
+            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+            title="Back to Top"
+            aria-label="Back to Top"
+          >
+            <ArrowUp size={16} />
+          </button>
         </span>
       </footer>
     </div>

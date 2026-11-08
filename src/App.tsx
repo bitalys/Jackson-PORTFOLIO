@@ -1,4 +1,4 @@
-import React, { useState, useEffect, Suspense } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef, Suspense } from 'react';
 import { Category, PortfolioItem, SiteProfile } from './types/portfolio';
 import { PortfolioStorage, DEFAULT_PROFILE } from './services/storage';
 import { supabase } from './lib/supabase';
@@ -68,13 +68,38 @@ export default function App() {
 
   // Listen for browser Back/Forward or hash changes
   useEffect(() => {
-    const handleHashChange = () => {
-      setCurrentRoute(parseHash(window.location.hash));
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    };
+    const handleHashChange = () => setCurrentRoute(parseHash(window.location.hash));
     window.addEventListener('hashchange', handleHashChange);
     return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
+
+  // Always start a new page at the very top.
+  // A smooth scroll animation is unreliable on phones: leftover touch momentum or late-loading
+  // images cancel it, leaving the new page scrolled near the bottom. So jump instantly, before paint.
+  useEffect(() => {
+    if ('scrollRestoration' in window.history) window.history.scrollRestoration = 'manual';
+  }, []);
+  const firstRender = useRef(true);
+  useLayoutEffect(() => {
+    if (firstRender.current) {
+      firstRender.current = false;
+      return;
+    }
+    const root = document.documentElement;
+    const toTop = () => window.scrollTo({ top: 0, left: 0, behavior: 'instant' as ScrollBehavior });
+    // Briefly disabling overflow stops any in-progress momentum scroll (iOS Safari)
+    const prevOverflow = root.style.overflow;
+    root.style.overflow = 'hidden';
+    toTop();
+    const raf = requestAnimationFrame(() => {
+      root.style.overflow = prevOverflow;
+      toTop();
+    });
+    return () => {
+      cancelAnimationFrame(raf);
+      root.style.overflow = prevOverflow;
+    };
+  }, [currentRoute]);
 
   // Auth helpers
   const handleLoginSuccess = () => {

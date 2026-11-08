@@ -514,6 +514,21 @@
 .tw-footer button:hover {
   opacity: 1;
 }
+.tw-footer .tw-top-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  opacity: 0.85;
+  transition: background 0.2s, color 0.2s, opacity 0.2s;
+}
+.tw-footer .tw-top-button:hover {
+  background: #fff;
+  color: #111;
+  opacity: 1;
+}
 
 /* Page hero (sub pages) */
 .tw-page-hero {
