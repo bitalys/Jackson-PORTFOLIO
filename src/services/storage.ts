@@ -347,8 +347,10 @@ function normalizeMedia(item: PortfolioItem): PortfolioItem {
     if (img.includes('jackson_portrait_headshot')) return PORTRAIT_IMAGE;
     return img;
   };
-  // No cover set: use the item's own first gallery photo before falling back to the bundled sample photo
-  const cover = item.coverImage ? fix(item.coverImage) : fix((item.galleryImages || []).find(Boolean) || '');
+  // No cover set: use the item's own first gallery photo. Items with no photo at all keep an empty cover,
+  // so every template shows its "no photo" placeholder instead of an unrelated sample photo.
+  const firstGallery = (item.galleryImages || []).find(Boolean);
+  const cover = item.coverImage ? fix(item.coverImage) : firstGallery ? fix(firstGallery) : '';
   const gallery = Array.from(
     new Set((item.galleryImages || []).filter(Boolean).map(fix).filter((img) => img !== cover))
   );

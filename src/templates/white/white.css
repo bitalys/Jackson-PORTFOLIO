@@ -606,6 +606,9 @@
 }
 
 /* Category feature (light) / block (dark) */
+.tw-feature.flip > :first-child {
+  order: 2;
+}
 .tw-feature {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -631,6 +634,63 @@
   letter-spacing: 0.12em;
   color: #aeb5ba;
   text-transform: uppercase;
+}
+
+/* Key results on category sections: one result per line */
+.tw-stat-list {
+  list-style: none;
+  margin: 40px 0 0;
+  padding: 0;
+  border-top: 1px solid var(--tw-line);
+}
+.tw-stat-list li {
+  display: grid;
+  grid-template-columns: minmax(96px, auto) 1fr;
+  align-items: baseline;
+  gap: 20px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--tw-line);
+}
+.tw-stat-list b {
+  font-size: 26px;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+.tw-stat-list span {
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--tw-muted);
+}
+
+/* Category sections on the navy background */
+.tw-dark-wrap .tw-lead {
+  color: var(--tw-white);
+}
+.tw-dark-wrap .tw-stat-list,
+.tw-dark-wrap .tw-stat-list li {
+  border-color: #26313b;
+}
+.tw-dark-wrap .tw-stat-list span {
+  color: #9ca5ad;
+}
+.tw-dark-wrap .tw-label {
+  color: #87909a;
+}
+
+/* Cards without a photo: grey card with dark text (also on navy sections) */
+.tw-story-card:not(.image) {
+  color: var(--tw-ink);
+}
+.tw-card-nophoto {
+  position: absolute !important;
+  top: 32px;
+  right: 32px;
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--tw-muted);
 }
 
 /* Key results (item page, full width) */
@@ -1136,6 +1196,12 @@
   }
   .tw-feature-photo {
     min-height: 55vh;
+  }
+  .tw-feature.flip > :first-child {
+    order: 0;
+  }
+  .tw-stat-list b {
+    font-size: 22px;
   }
   .tw-block {
     grid-template-columns: 1fr;

@@ -18,6 +18,7 @@ const ItemCards: React.FC<{ items: PortfolioItem[] }> = ({ items }) => (
         style={{ minHeight: 360 }}
       >
         {item.coverImage && <img src={item.coverImage} alt="" loading="lazy" referrerPolicy="no-referrer" />}
+        {!item.coverImage && <span className="tw-card-nophoto">No photo</span>}
         <div className="tw-card-num">
           {pad2(i + 1)}
           {item.date ? ` · ${item.date}` : ''}
@@ -136,61 +137,48 @@ export const WhiteCategory: React.FC<Props> = ({ categories, items, categoryId, 
         const name = g.sub?.name || 'More';
         const label = `${pad2(idx + 1)} / ${name}`;
         const lead = g.items.find((i) => i.coverImage);
+        // Key results: the photo item's results, otherwise the first item in this sub-menu that has any
+        const statsItem =
+          (lead?.highlights?.length ? lead : undefined) || g.items.find((i) => i.highlights && i.highlights.length > 0);
+        const dark = idx % 2 === 1; // alternate background for rhythm
+        const flip = idx % 2 === 1; // and the photo side
 
-        if (idx % 2 === 0) {
-          return (
-            <section className="tw-section" key={g.sub?.id || 'rest'}>
-              <div className="tw-feature tw-reveal">
-                <Media className="tw-feature-photo" src={lead?.coverImage} alt={name} />
-                <div>
-                  <p className="tw-label">{label}</p>
-                  <h2 className="tw-h2">
-                    <Lines text={name} />
-                  </h2>
-                  {g.sub?.description && (
-                    <p className="tw-lead" style={{ marginTop: 28 }}>
-                      {g.sub.description}
-                    </p>
-                  )}
-                  {lead?.highlights && lead.highlights.length > 0 && (
-                    <div className="tw-stats">
-                      {lead.highlights.slice(0, 3).map((h) => (
-                        <div key={h.id}>
-                          <b>{h.value}</b>
-                          <span>{h.label}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-              <ItemCards items={g.items} />
-            </section>
-          );
-        }
-
-        return (
-          <div className="tw-dark-wrap" key={g.sub?.id || 'rest'}>
-            <section className="tw-section">
-              <div className="tw-block tw-reveal">
-                <div>
-                  <span className="tw-label" style={{ display: 'block' }}>
-                    {label}
-                  </span>
-                  {g.sub?.description && <p>{g.sub.description}</p>}
-                </div>
-                <div>
-                  <h2 className="tw-h2">
-                    <Lines text={name} />
-                  </h2>
-                  <p className="tw-tagline" style={{ marginTop: 20 }}>
-                    {g.items.length} {g.items.length === 1 ? 'story' : 'stories'}
+        const section = (
+          <section className="tw-section" key={dark ? undefined : g.sub?.id || 'rest'}>
+            <div className={`tw-feature tw-reveal ${flip ? 'flip' : ''}`}>
+              <Media className="tw-feature-photo" src={lead?.coverImage} alt={name} />
+              <div>
+                <p className="tw-label">{label}</p>
+                <h2 className="tw-h2">
+                  <Lines text={name} />
+                </h2>
+                {g.sub?.description && (
+                  <p className="tw-lead" style={{ marginTop: 28 }}>
+                    {g.sub.description}
                   </p>
-                </div>
+                )}
+                {statsItem && (
+                  <ul className="tw-stat-list" aria-label="Key results">
+                    {statsItem.highlights.map((h) => (
+                      <li key={h.id}>
+                        <b>{h.value}</b>
+                        <span>{h.label}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
-              <ItemCards items={g.items} />
-            </section>
+            </div>
+            <ItemCards items={g.items} />
+          </section>
+        );
+
+        return dark ? (
+          <div className="tw-dark-wrap" key={g.sub?.id || 'rest'}>
+            {section}
           </div>
+        ) : (
+          section
         );
       })}
     </>

@@ -32,7 +32,11 @@ export const Media: React.FC<{
   style?: React.CSSProperties;
 }> = ({ src, alt, className = '', label, style }) => (
   <div className={`tw-media ${src ? '' : 'tw-media-empty'} ${className}`} style={style}>
-    {src ? <img src={src} alt={alt} loading="lazy" referrerPolicy="no-referrer" /> : label ? <span>{label}</span> : null}
+    {src ? (
+      <img src={src} alt={alt} loading="lazy" referrerPolicy="no-referrer" />
+    ) : (
+      <span>{label ?? 'No photo'}</span>
+    )}
   </div>
 );
 
