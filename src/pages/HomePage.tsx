@@ -76,8 +76,11 @@ export const HomePage: React.FC<HomePageProps> = ({
 
             <button
               type="button"
-              onClick={() => navigateTo({ page: 'category', categoryId: categories[0]?.id || 'athletics' })}
-              className="cursor-pointer text-xs font-semibold text-neutral-300 hover:text-white flex items-center gap-1 transition-colors px-3 py-1.5 rounded-lg bg-neutral-900 border border-neutral-800"
+              // Open the first featured item in the preview popup; its ‹ › arrows browse every item
+              onClick={() => displayItems[0] && onOpenModal(displayItems[0])}
+              disabled={displayItems.length === 0}
+              title="Browse all items in the preview"
+              className="cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed text-xs font-semibold text-neutral-300 hover:text-white flex items-center gap-1 transition-colors px-3 py-1.5 rounded-lg bg-neutral-900 border border-neutral-800"
             >
               <span>View All</span>
               <ChevronRight className="w-4 h-4" />
